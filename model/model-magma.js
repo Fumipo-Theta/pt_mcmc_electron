@@ -204,13 +204,14 @@ importScripts(
       })
 
       // repeat until Mg# of targetPhase exceeds targetMgN or F becomes out of range [0,1]
+      let limmit = 0
       while (isInRange(F) && !isExceed(observedPhase.getMgNumber())) {
         let { T, P } = magma.getThermodynamicProperty();
 
+        // equilibrate & record
         solids.map(entry => {
           entry[1].equilibrate("melt", T, P)
         })
-
         if (isRecord) {
           solids.map(([name, phase]) => {
             phase.pushProfile(stoichiometry[name] * F, T, P, pathName)
@@ -218,40 +219,46 @@ importScripts(
           melt.pushProfile(1 + F * sign, T, P, pathName)
         }
 
+        // change melt as not exceeding final condition
         melt.differentiate(
           solids.map(([name, phase]) => { return { phase: phase, f: stoichiometry[name] } }),
           dF * sign
         )
           .compensateFe()
 
+        // to check whether exceeding final condition
         observedPhase.equilibrate("melt", T, P)
 
-        let limmit = 0
-        //console.log(observedPhase.getMgNumber())
+        // While exceeding final condition, 
+        //  revert melt composition and add/remove 
+        //  smaller fraction of solid again.
         while (isExceed(observedPhase.getMgNumber())) {
           let { T, P } = magma.getThermodynamicProperty();
-          //console.log(dF, observedPhase.getMgNumber())
+
+          // revert change of melt composition
           melt.differentiate(
             solids.map(([name, phase]) => { return { phase: phase, f: stoichiometry[name] } }),
             dF * sign / (1 + dF * sign) * -1
           ).compensateFe()
 
-          //console.log(melt.getMgNumber())
-
+          // change with smaller fraction
           dF *= 0.5;
-
           melt.differentiate(
             solids.map(([name, phase]) => { return { phase: phase, f: stoichiometry[name] } }),
             dF * sign
           ).compensateFe()
 
+          // reequilibrate to check whether exceeding final condition
           solids.map(entry => {
             entry[1].equilibrate("melt", T, P)
           })
+
           limmit++
           if (limmit > 100) break;
         }
+        //=========================
 
+        // Update total fraction not exxceeding final condition
         F += dF;
 
         if (isSame(observedPhase.getMgNumber())) break;
