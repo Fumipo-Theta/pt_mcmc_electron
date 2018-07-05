@@ -69,13 +69,13 @@ importScripts(
     /** Utility functions
      * 
      */
-    const inRange = (min, max) => x => (min <= x && x <= max);
-    const compare = (target, sign = 1.) => x => (x - target) * sign > 0;
+    const checkInRange = (min, max) => x => (min <= x && x <= max);
+    const checkExceed = (target, sign = 1.) => x => (x - target) * sign > 0;
     const getD = (D, phase, component) => Diffusion.getD(D, phase, component);
 
 
     /**
-     * create melt, olivine, orthopyroxene, and spinel.
+     * Create objects of host melt, olivine, orthopyroxene, and spinel.
      * Register partitioning coefficient (Nernst's and exchange type) to each solid phase.
      * Register equilibrium liquid phase to each solid phase.
      * 
@@ -134,6 +134,7 @@ importScripts(
     }
 
     /**
+     * Create object to simulate lattice diffusion. 
      * 
      * @param {MagmaSystem} magma 
      * @param {*} ope 
@@ -191,8 +192,8 @@ importScripts(
         ? { sign: 1., pathName: "ascend" }
         : { sign: -1., pathName: "descend" };
 
-      const isOver = compare(targetMgN, sign);
-      const isInRange = inRange(-1, 1);
+      const isExceed = checkExceed(targetMgN, sign);
+      const isInRange = checkInRange(-1, 1);
       let F = 0;
       const solids = Object.entries(magma.solids());
 
@@ -201,7 +202,7 @@ importScripts(
       })
 
       // repeat until Mg# of targetPhase exceeds targetMgN or F becomes out of range [0,1]
-      while (isInRange(F) && !isOver(observedPhase.getMgNumber())) {
+      while (isInRange(F) && !isExceed(observedPhase.getMgNumber())) {
         let { T, P } = magma.getThermodynamicProperty();
 
         solids.map(entry => {
@@ -209,23 +210,22 @@ importScripts(
         })
 
         if (isRecord) {
-          solids.map(entry => {
-            let name = entry[0], phase = entry[1];
+          solids.map(([name, phase]) => {
             phase.pushProfile(stoichiometry[name] * F, T, P, pathName)
           })
           melt.pushProfile(1 + F * sign, T, P, pathName)
-
         }
 
-
         melt.differentiate(
-          solids.map(entry => { return { phase: entry[1], f: stoichiometry[entry[0]] } }),
+          solids.map(([name, phase]) => { return { phase: phase, f: stoichiometry[name] } }),
           dF * sign
         )
           .compensateFe()
 
         F += dF;
       }
+
+      // Record final state
       if (isRecord) {
         solids.map(entry => {
           let name = entry[0], phase = entry[1];
@@ -239,8 +239,15 @@ importScripts(
 
 
 
-    /**
+    /** 
+     * Approximated simulation of magma mixing. 
+     * The exotic melt composition and its mass contribution to the mixture is unknown.
      * 
+     * We approximate the mixture composition by assuming 
+     *   mixture and erupted melt are on the same liquid line of ascent or that of descent.
+     * Therefore, the mixture can be calculated by addition or removing of small fraction of
+     *   solid phases repeatedly.
+     *  
      * @param {*} magma 
      * @param {*} ope 
      * @param {*} result
@@ -327,20 +334,51 @@ importScripts(
       return {}
     }
 
-    const getProfileSection = (magma, targetPhase, Rini, Rfin) => {
+    /**
+     * Calculate radius in the crystal by assuming spherical shape and constant density 
+     *   from mass fraction at each step of growth. 
+     * The initial and final radius are known by line analysis with EPMA. 
+     * 
+     * @param {*} initialRadius 
+     * @param {*} finalRadius 
+     * @param {*} totalMass 
+     */
+    const massToRadiusByConstantDensity = (initialRadius, finalRadius, totalMass) => {
+      const A = (Math.pow(finalRadius, 3) - Math.pow(initialRadius, 3)) / totalMass;
+      return f => Math.pow(A * f + Math.pow(initialRadius, 3), 1 / 3)
+    }
+
+    /**
+     * Relate composition and radius in the position of the crystal. 
+     * 
+     * @param {*} magma 
+     * @param {*} targetPhase 
+     * @param {*} Rini 
+     * @param {*} Rfin 
+     */
+    const getProfileWithRadius = (magma, targetPhase, Rini, Rfin) => {
       const profile = magma.phase[targetPhase].getProfile("descend");
       const l = profile.F.length;
-
-
-      const A = (Math.pow(Rfin, 3) - Math.pow(Rini, 3)) / profile.F[l - 1];
-
-      profile.x = profile.F.map(f => Math.pow(A * f + Math.pow(Rini, 3), 1 / 3));
-
-
+      profile.x = profile.F.map(massToRadiusByConstantDensity(Rini, Rfin, profile.F[l - 1]));
       return profile;
     }
 
     /**
+     * Simulate elemental diffusion in the focused crystal. 
+     * The crystal is spherical symmetry. 
+     * Diffusion coefficients depends only on temperature as Arhenius relation. 
+     * 
+     * In the model, inter diffusivity of Fe and Mg components and self diffusivity of Cr2O3 are 
+     *  considered. 
+     * During diffusion, the host melt composition is constant and local equilibrium at crystal surface
+     *  always established. 
+     * 
+     * Spatially one dimension diffusion equation is numerycally solved by Crank-Nicolson method. 
+     * Neumann condition at the center of crystal, and Dericklet condition at the edge. 
+     * 
+     * The scale of time and temperature for diffusivity is treated as unknown parameter, "total scale of diffusion". 
+     * The scale is originally introduced by Lasaga (1983) as compressed time. 
+     * Total scale of diffusion represent all possible cooling history which yeild the same value of compressed time. 
      * 
      * @param {MagmaSystem} magma 
      * @param {*} ope 
@@ -350,10 +388,10 @@ importScripts(
       const { targetPhase, tau, R, Rprev, divNum } = ope;
 
       // chemical profileを取得
-      const section = getProfileSection(magma, targetPhase, Rprev, R)
+      const section = getProfileWithRadius(magma, targetPhase, Rprev, R)
 
-      const diffusion = magma.getDiffusionProfile(targetPhase);
-      Object.values(diffusion).map(d => {
+      const diffusionInSphere = magma.getDiffusionProfile(targetPhase);
+      Object.values(diffusionInSphere).map(d => {
         d.appendSection(section)
           .setMaxCompressedTime(tau)
           .divideSpaceEqually(divNum)
@@ -366,8 +404,9 @@ importScripts(
     }
 
     /** 
-     * 指定された半径で区切られた化学組成のセクションの数だけ,
-     * 結晶成長と結晶内拡散を繰り返す
+     * Assumed crustal processes are repeatation of magma mixing, crystal growth, 
+     *   and elemental diffusion in crystals.
+     * The time of repeatation is the same as number of growth satge of the focused crystal. 
     */
     const magmaProcesses = radius.map((_, i) => {
       return (i === 0)
