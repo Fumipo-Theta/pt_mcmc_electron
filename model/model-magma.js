@@ -71,6 +71,7 @@ importScripts(
      */
     const checkInRange = (min, max) => x => (min <= x && x <= max);
     const checkExceed = (target, sign = 1.) => x => (x - target) * sign > 0;
+    const checkSame = (target, eps) => x => Math.abs(x - target) < eps;
     const getD = (D, phase, component) => Diffusion.getD(D, phase, component);
 
 
@@ -194,6 +195,7 @@ importScripts(
 
       const isExceed = checkExceed(targetMgN, sign);
       const isInRange = checkInRange(-1, 1);
+      const isSame = checkSame(targetMgN, 1e-3);
       let F = 0;
       const solids = Object.entries(magma.solids());
 
@@ -222,7 +224,37 @@ importScripts(
         )
           .compensateFe()
 
+        observedPhase.equilibrate("melt", T, P)
+
+        let limmit = 0
+        //console.log(observedPhase.getMgNumber())
+        while (isExceed(observedPhase.getMgNumber())) {
+          let { T, P } = magma.getThermodynamicProperty();
+          //console.log(dF, observedPhase.getMgNumber())
+          melt.differentiate(
+            solids.map(([name, phase]) => { return { phase: phase, f: stoichiometry[name] } }),
+            dF * sign / (1 + dF * sign) * -1
+          ).compensateFe()
+
+          //console.log(melt.getMgNumber())
+
+          dF *= 0.5;
+
+          melt.differentiate(
+            solids.map(([name, phase]) => { return { phase: phase, f: stoichiometry[name] } }),
+            dF * sign
+          ).compensateFe()
+
+          solids.map(entry => {
+            entry[1].equilibrate("melt", T, P)
+          })
+          limmit++
+          if (limmit > 100) break;
+        }
+
         F += dF;
+
+        if (isSame(observedPhase.getMgNumber())) break;
       }
 
       // Record final state
