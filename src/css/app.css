@@ -1,0 +1,601 @@
+/* 共通コンポーネント */
+	
+
+	/* スクロールバー */
+:root{
+	--accent-color: #2196F3;
+	--active-color: #FF4081;
+}
+	
+::-webkit-scrollbar {
+    width: 5px;
+}
+ 
+::-webkit-scrollbar-track {
+    background-color: rgba(200, 200, 200, 1)
+}
+ 
+::-webkit-scrollbar-thumb {
+		background-color: var(--accent-color);
+}
+
+/* all */
+
+*{
+	box-sizing:border-box;
+}
+
+/* body */
+
+body{
+	margin: 0;
+	background-color: #ddd;
+	font-size:1.5rem;
+}
+
+hr{
+	border-top: 1.5px solid #ddd;
+}
+
+a,
+a:visited{
+	text-decoration: none;
+	color: var(--accent-color);
+}
+
+a.button{
+	display: flex;
+	align-items: center;
+	justify-content:space-around;
+}
+
+svg{
+	margin: 0 10px;
+}
+
+form{
+	margin:0;
+}
+
+ul{
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+li{
+	display: flex;
+	margin: 10px 0;
+	border-bottom: 1px solid #ddd;
+}
+
+ul.noLine li{
+	border: none;
+}
+
+table{
+	border-collapse: collapse;
+}
+
+th,td{
+	border: 1px solid #444477;
+	padding: 5px 10px;
+}
+
+th{
+	background-color: var(--accent-color);
+	color: #ffffff;
+	font-family: "Arial";
+}
+
+/* page navigation */
+@media screen and (max-width:1079px) {
+	#page_nav{
+		width: 100vw;
+		height: 60px;
+		position: fixed;
+	
+		margin: 0;
+	
+		top: 0;
+		left: 0;
+		background-color: rgba(200,200,200,0.5);
+		font-size: 1.2rem;
+		display: flex;
+		justify-content: center;
+	}
+	
+	
+	.flex_column_wrap{
+		display: flex;
+	}
+	
+	.button.nav{
+		width: 100px;
+		height: 60px;
+		border: none;
+		color: #888;
+	}
+	
+	.card{
+	width: 90vw;
+	min-height: 10px;
+	
+	margin: 20px auto 20px auto;
+	overflow: hidden;
+	border-radius: 5px;
+	overflow:auto;
+	}
+}
+
+@media screen and (min-width:1080px) {
+    /*　画面サイズが1024pxからはここを読み込む　*/
+ 
+	#page_nav{
+		width: 100px;
+		height: 100vh;
+		position: fixed;
+	
+		margin: 0;
+		padding: 10px;
+	
+		top: 0;
+		right: 0;
+		background-color: rgba(200,200,200,0.5);
+		font-size: 1.2rem;
+		display: flex;
+		justify-content: center;
+	}
+
+	.flex_column_wrap{
+		display: flex;
+		flex-direction: column;
+	}
+	
+	.button.nav{
+		width: 100px;
+		height: 100px;
+		margin-bottom: 20px;
+		border: none;
+		color: #888;
+	}
+
+	.card{
+	width: 90vw;
+	min-height: 10px;
+	min-width: 1200px;
+	margin: 20px 120px 20px auto;
+	overflow: hidden;
+	border-radius: 5px;
+	overflow:auto;
+	}
+}
+
+
+
+/* overlay */
+#overlay{
+	position: fixed;
+	width: 100%;
+	height: 100%;
+	top:0;
+	background-color: rgba(255,255,255,0.75);
+	z-index: 999;
+}
+
+	#overlay::after{
+		content: "Wait a moment...";
+		position: absolute;
+		top: 40%;
+		left: 40%;
+		color: var(--accent-color);
+		font-size: 3rem;
+	}
+	
+	#progressBar{
+		position: relative;
+		width: 50%;
+		top: 50%;
+		margin: 5px auto;
+		padding: 3px;
+		border: 1px solid #000;
+	}
+	
+	#progressBar .percent{
+		background-color: var(--accent-color);
+		height: 10px;
+		width: 0;
+	}
+
+/* card */
+
+.inner_card{
+	display: flex;
+	width: 100%;
+	min-height: 10px;
+	margin: 1px auto 1px auto;
+	padding: 20px 40px;
+	background-color: #fff;
+	box-shadow: 0 1px 1px 1px rgba(0,0,0,0.3);
+	overflow:auto;
+}
+
+.inner_card.centering{
+  justify-content: center;
+}
+
+.title{
+	color: #449;
+	font-size: 1.2rem;
+	font-family: "Arial";
+	border-left: 10px solid #447;
+}
+
+.subtitle{
+	color: #888;
+	font-size: 1.2rem;
+	font-family: "Arial";
+}
+
+.flexRow{
+	display: flex;
+}
+
+	.flexRow .row{
+		flex:1;
+	}
+
+/* top form */
+.card{
+	font-family: "Arial";
+	color:#888;
+}
+
+.file_form{
+	display: flex;
+}
+
+	.form_left{
+	}
+
+		.file_select li{
+			display: flex;
+			margin: 10px 0;
+		}
+		
+			.instruction{
+				flex: 3;
+				min-width: 200px;
+			}
+			
+			.input_element{
+				flex: 2;
+				min-width: 200px;
+				padding: 10px;
+			}
+			
+			.filename{
+				flex: 1;
+				min-width: 200px;
+				padding: 10px ;
+			}
+
+	.form_right{
+	}
+
+
+label.file,
+label.button{
+	cursor: pointer;
+	font-size: 1.2rem;
+	margin: 10px 10px;
+	padding:10px 30px;
+	background-color: transparent;
+	border: 0.5px solid #2196f3;
+	color: var(--accent-color);
+	border-radius: 5px;
+	font-family: "Arial";
+}
+
+label.file:hover,
+label.file:focus,
+label.button:hover,
+label.button:focus{
+	transition: all .3s;
+	background-color: var(--accent-color);
+	color: #fff;
+}
+
+label.file:active,
+label.file:active{
+	border: 0.5px solid #FF4081;
+	background-color: #FF4081;
+}
+
+
+input{
+	font-size: 1.5rem;
+}
+
+input[type="text"],
+input[type="number"]{
+	margin-left: 20px;
+	margin-right: 20px;
+	border: none;
+	border-bottom: 1px solid var(--accent-color);
+}
+
+.button{
+	background-color: transparent;
+	border: 0.5px solid var(--accent-color);
+	color: var(--accent-color);
+	border-radius: 5px;
+	font-family: "Arial";
+}
+
+.button.round,
+.button.round{
+	width: 100px;
+	height: 100px;
+	border-radius: 50%;
+}
+
+
+.button:hover,
+.button:focus,
+.button.nav:hover,
+.button.nav:focus{
+	transition: all .3s;
+	background-color: var(--accent-color);
+	color: #fff;
+	border: 0.5px solid var(--accent-color);
+	box-shadow: 0 2px 5px 2px rgba(0,128,255,0.5);
+}
+
+.button:active,
+.button.nav:active{
+	background-color: #FF4081;
+	border: 0.5px solid #FF4081;
+	box-shadow: 0 2px 5px 2px rgba(255,30,40,0.5);
+}
+
+
+.button:disabled{
+	background-color: #ddd;
+	color: #fff;
+	border: none;
+	box-shadow: none;
+}
+
+.fileName{
+	color: #2196f3;
+	font-size: 1.2rem;
+	font-family: "Arial";
+}
+
+#start_button,
+#ga_start_button{
+	margin: auto auto;
+}
+
+/* Profile card */
+#line_profile,
+#analyzed_profile,
+#model_no_diffusion_profile,
+#model_diffused_profile,
+#energy_chart{
+	flex-wrap: wrap;
+	align-content: space-between;
+}
+
+#line_profile canvas{
+	margin: 20px;
+}
+
+/* summary pain */
+#accepted_param{
+	flex: 1;
+}
+
+		#accepted_param .summary_key{
+			flex: 1.2;
+			font-size: 1rem;
+			color: #888;
+		}
+
+		#accepted_param .summary_value{
+			flex: 3;
+			font-size: 1.5rem;
+			color: #000;
+		}
+
+#download_menu{
+	flex: 2;
+}
+	
+	#download_menu li{
+		border: none;
+	}
+
+/* Parameter summary card */
+.paramInfo{
+	align-content: space-between;
+	width: 100%;
+}
+
+	.paramInfo canvas{
+		margin: 5px;
+	}
+		
+
+	.paramInfo .statistics{
+		flex: 1.5;
+		min-width: 20px;
+		max-width: 300px;
+		padding: 10px;
+	}
+
+		.statistics ul{
+
+		}
+
+		.statistics li{
+
+		}
+		
+		.statistics .summary_key{
+			flex: 1.2;
+			font-size: 1rem;
+			color: #888;
+		}
+
+		.statistics .summary_value{
+			flex: 3;
+			font-size: 1.2rem;
+			color: #000;
+		}
+
+	.statistics_title{
+		vertical-align: middle;
+		color: #447;
+		border-right: 1px solid #447;
+		width: 1.5rem;
+		text-align: left;
+		position: relative;
+	}
+
+	.statistics_title span{
+		display: inline-block;
+		transform: rotate(-90deg);
+		transform-origin: left top;
+		position: absolute;
+		bottom:0%;
+		line-height: 0;
+	}
+
+	
+
+		
+
+/* graph */
+
+
+
+.axis text{
+	font: 8px "Arial";
+	fill: #888;
+}
+
+text.xlabel,
+text.ylabel{
+	font: 20px "Arial";
+	fill: #888
+}
+
+.axis path,
+.axis line{
+	fill:none;
+	stroke: #bbb;
+	stroke-width: 1;
+	shape-rendering: crispEdges;
+}
+
+.clearfix::after{
+	content: '';
+	display: block;
+	clear: both;
+	background: rgba(0,0,0,0);
+}
+
+/* simbol */
+
+circle.d{
+	fill:#fff;
+	stroke: var(--accent-color);
+	stroke-width:2;
+	r:3
+}
+
+path.d{
+	stroke:var(--accent-color);
+	stroke-width: 1;
+}
+
+path.data{
+	stroke:#000;
+	stroke-width: 2;
+}
+
+#line_profile path.d{
+	stroke-width:2;
+}
+
+#analyzed_profile{
+	background-color: #404050;
+}
+
+#analyzed_profile h3{
+	color: #404050;
+}
+
+#analyzed_profile circle.d{
+	fill: #fff;
+	stroke: var(--accent-color);
+	stroke-width: 3;
+	r:4;
+}
+
+#analyzed_profile path.d{
+	stroke-width: 3;
+}
+
+#analyzed_profile circle.data{
+	fill: #fff;
+	stroke: #fff;
+	stroke-width: 1;
+}
+
+#analyzed_profile path.data{
+	stroke: #fff;
+	stroke-width: 3;
+}
+
+/*
+
+
+
+circle.Fe_Mg{
+	fill:#fff;
+	stroke:#f00;
+	stroke-width: 1;
+}
+
+path.Fe_Mg{
+	stroke:#f00;
+}
+
+circle.Cr2O3{
+	fill:#fff;
+	stroke:#0f0;
+	stroke-width: 1;
+}
+
+path.Cr2O3{
+	stroke:#0f0;
+}
+
+circle.NiO{
+	fill:#fff;
+	stroke:#00f;
+	stroke-width: 1;
+}
+
+path.NiO{
+	stroke:#00f;
+}
+*/
+
+rect.data{
+	fill: var(--accent-color);
+	stroke: #ffffff;
+}

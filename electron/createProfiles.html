@@ -1,0 +1,722 @@
+<html>
+
+<head>
+	<meta http-equiv="Content-Type" charset="UTF-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+	<link rel="stylesheet" href="./css/mainStyle3.css" charset="utf-8">
+	<link rel="icon" type="image/png" href="./image/icon.png" sizes="64x64">
+	<title>Create chemical profile with diffusion ver. 3.0</title>
+</head>
+<style>
+.console_toggle_button{
+	margin: 0 10px;
+	padding: 5px 20px;
+	border: 1px solid #2196f3;
+	border-radius: 5px;
+	color: #2196f3;
+}
+
+.console_toggle_button.checked{
+	border: 1px solid #ff4081;
+	background-color: #ff4081;
+	color: #ffffff;
+}
+
+.console_toggle_button:hover{
+	border: 1px solid #2196f3;
+	background-color: #2196f3;
+	color: #ffffff;
+}
+
+.parameter_consoles{
+	display: flex;
+	margin: 5px;
+}
+
+.parameter_consoles .discription{
+	margin: 0 10px;
+	flex:2;
+}
+
+.parameter_consoles input{
+	flex:1;
+}
+
+#cooling_path{
+	flex-direction: column;
+}
+
+</style>
+
+<body id="top">
+	<div id="link" class="card">
+		<div class="inner_card title">
+			Create chemical profile with diffusion ver. 3.0
+		</div>
+		<div class="inner_card">
+			<ul>
+				<li><a href="#" target="_blank">Read me</a></li>
+			</ul>
+		</div>
+	</div>
+
+	<!-- Form -->
+	<div id="form" class="card">
+		<div class="inner_card title">
+			Console
+		</div>
+		<div>
+			<!-- Load file -->
+			<div class="file_form flexRow">
+				<div class="form_left inner_card row">
+					<ul class="file_select noLine">
+						<li>
+							<span class="instruction">MCMC operand(.json)</span>
+							<span class="input_element"><label for="operandFile" class="file">
+							Select File
+							<input type="file" accept=".json" id="operandFile" style="display:none">
+</label>
+</span>
+<span id="operandFile_name" class="fileName">not selected</span>
+</li>
+
+<li>
+	<span class="instruction">Analyzed profile (.csv)</span>
+	<span class="input_element"><label for="analyzedProfileFile" class="file">
+							Select File
+							<input type="file" accept=".csv" id="analyzedProfileFile" style="display:none">
+</label>
+</span>
+<span id="analyzedProfileFile_name" class="fileName">not selected</span>
+</li>
+<li>
+	<span class="instruction">Error file (.csv)</span>
+	<span class="input_element"><label for="errorFile" class="file">
+							Select File
+							<input type="file" accept=".csv" id="errorFile" style="display:none">
+</label>
+</span>
+<span id="errorFile_name" class="fileName">not selected</span>
+</li>
+</ul>
+</div>
+</div>
+
+<!-- Element List -->
+<div class="inner_card" id="parameter_pain">
+	<div>
+		Element list ( separated by [Space] )
+
+	</div>
+
+	<div>
+		<input type="text" id="element_list" value="Fe_Mg Cr2O3 NiO">
+	</div>
+</div>
+
+<!-- Diffusion coefficient -->
+<div class="inner_card">
+
+	<div>
+		Diffusion coefficient
+	</div>
+
+</div>
+
+<div class='inner_card'>
+		<ul>
+			<li>
+				<span class='discription'>Add noise</span>
+				<input type="checkbox" id='add_noise_switch'>
+			</li>
+			<li>
+				<span class='discription'>Noise ampritude (%)</span>
+				<input type="nunber" id='noise_amplitude' value=10>
+			</li>
+		</ul>
+		
+</div>
+
+<div class="inner_card row">
+	<input id="start_button" class="button round" type="button" value="MCMC">
+</div>
+</div>
+
+<!-- Visualization card -->
+<div class="card">
+	<div class="inner_card title">
+		Visualize previous result
+	</div>
+
+	<div class='inner_card' id='toggle_console_wrapper'>
+		<!-- ここにコンソール表示ボタンを設置 -->
+	</div>
+
+	<div class="inner_card row">
+		<!-- ここにプロファイル変形コンソールを構築 -->
+		<div id='console_profile_transform'>
+		</div>
+
+		<div id='constant_parameters'>
+		</div>
+	</div>
+
+
+	<div id="line_profile" class="inner_card">
+		<!-- ここにサンプリングされたプロファイルを描く -->
+	</div>
+
+
+
+	<div class='inner_card' id='profile_table'>
+		<!-- ここに生成されたプロファイルのテーブルを表示 -->
+	</div>
+	
+	<div class='inner_card' id='not_diffused_table'>
+		<!-- ここに生成されたプロファイルのテーブルを表示 -->
+	</div>
+	
+		<div id='cooling_path' class='inner_card'>
+		<!-- ここに冷却パスを描く -->
+	</div>
+</div>
+
+<script src="../jslib/mt.js" charset="utf-8"></script>
+<script src="../jslib/textFunction.js" charset="utf-8"></script>
+<script src="./js/utility.js" charset="utf-8"></script>
+<script src="../jslib/drawer.js" charset="utf-8"></script>
+<script src="../jslib/mt.js" charset="utf-8"></script>
+
+<script>
+	window.jQuery = window.$ = require('../jslib/jquery-2.2.0.min.js');
+	window.d3 = require("../jslib/d3.min.js")
+
+	/* gloval objects */
+	const g = {};
+	const gIO = {};
+
+	g.operand = {};
+		g.operand.elementList = setElementList(document.getElementById("element_list").value);
+
+	/* 統計 st*/
+	g.st = {};
+		g.st.keys = [];
+		g.st.indexes = [];
+		g.st.samplingNum = 1;
+		g.st.burnInNum = 0;
+		g.st.data = [];
+
+
+	/* グラフ graph */
+	gIO.graph = {};
+		gIO.graph.histo = [];
+		gIO.graph.corelation = [];
+		gIO.graph.sampled = [];
+		gIO.graph.profile = [];
+		gIO.coolPath = []
+
+	/* ファイル */
+	g.io = {};
+		g.io.sampledResultPath = '';
+		g.io.operandResultPath = '';
+		g.io.startTime = '';
+		g.io.teminateTime = '';
+
+	/* electron ファイル選択のためのnodeモジュール */
+	const remote = require('electron').remote;
+	const dialog = remote.dialog;
+	const browserWindow = remote.BrowserWindow;
+	const nodemailer = require('nodemailer');
+
+
+	/* file system モジュール */
+	const fs = require('fs');
+
+	/* MCMC worker */
+	const mcWorkers = [];
+	mcWorkers[0] = new Worker('./js/mcmcWorker_v3.0.js');
+	mcWorkers.map((worker) => worker.addEventListener('message', mcStoreResult, false));
+
+	/* Set event to buttons */
+	document.getElementById("start_button").onclick = function () {
+
+		if (!checkHasPropaty(g, ["operand", "analyzedCsvObj", "errorCsvObj"])) return false;
+		if (!checkHasPropaty(g.operand,
+			["randomVector", "elementList", "sectionInfo", "diffusionCoefficient"])) return false;
+
+		/* プロファイル準備 */
+				setProfileChart(g);
+				setProfileTransformConsole(g);
+
+				// profile graph
+				g.operand.elementList.map((key) => {
+			let extent = {
+				x: getExtentOfCsvObj(g.analyzedCsvObj, 'x'),
+				y: { min: 0, max: getExtentOfCsvObj(g.analyzedCsvObj, key).max }
+			};
+
+			gIO.graph.profile.push(new Drawer('profile_' + key, extent, {
+				xTics: true,
+				xLabel: { text: 'Radius' },
+				yTics: true,
+				yLabel: { text: key }
+			}))
+				});
+		gIO.graph.profile.map((o) => o.drawAxis({ xAxis: true, yAxis: true }));
+
+		// cooling path graphs
+		let list = ['temperature'].concat(g.operand.elementList);
+
+		g.operand.sectionInfo.map((v, i) => {
+			gIO.coolPath[i] = {};
+
+			list.map((key) => {
+				gIO.coolPath[i][key] = new Drawer('cooling_' + key + '_' + i,
+					{ x: { min: 0, max: 0 }, y: { min: 0, max: 0 } },
+					{
+						xTics: { font: '8px Arial' },
+						yTics: true,
+						yLabel: { text: key }
+					}
+				);
+
+			});
+		})
+
+		mcFirstDispatch(mcWorkers, g, [1]);
+		mcManualDispatch(mcWorkers, g);
+	}
+
+
+	document.getElementById("element_list").onchange = function () {
+		g.operand.elementList = setElementList(document.getElementById("element_list").value);
+		console.log('Element list is updated: ' + g.operand.elementList);
+	};
+
+	/* Load analyzed profile */
+	document.getElementById("analyzedProfileFile").onchange = function (evt) {
+		const file = evt.target.files;
+		if (file.length < 1) return false;
+
+		g.operand.analyzedUrl = file[0].name;
+
+		const reader = new FileReader();
+		reader.readAsText(file[0]);
+		reader.onload = function (ev) {
+			g.analyzedCsvObj = text2Object(reader.result, 'csv');
+			setText("#analyzedProfileFile_name", file[0].name);
+		};
+
+		reader.onerror = function (er) {
+			setText("#analyzedProfileFile_name", "Not loaded");
+		}
+	};
+
+
+	/* Load error of measurement */
+	document.getElementById("errorFile").onchange = function (evt) {
+		const file = evt.target.files;
+		if (file.length < 1) return false;
+
+		const reader = new FileReader();
+		reader.readAsText(file[0]);
+		reader.onload = function (ev) {
+			g.errorCsvObj = text2Object(reader.result, 'csv');
+			console.log(g.operand.errorCsvObj)
+			setText("#errorFile_name", file[0].name);
+			// Show analyzed profile
+
+		};
+		reader.onerror = function (er) {
+			setText("#errorFile_name", "Not loaded");
+		}
+
+		g.operand.errorUrl = file[0].name;
+	};
+
+	/* Load operand*/
+	document.getElementById("operandFile").onchange = function (evt) {
+		const file = evt.target.files;
+		const reader = new FileReader();
+
+		if (file.length < 1) return false;
+
+		showCard(["#overlay"]);
+
+		reader.readAsText(file[0]);
+		reader.onload = function (ev) {
+			var resultObj = JSON.parse(reader.result);
+
+			if (resultObj.operand) {
+				g.operand = copyObject(resultObj.operand);
+				g.st.keys = Object.keys(g.operand.randomVector);
+				g.st.indexes = getParamIndexes(g.st.keys, g.operand.sectionInfo.length);
+			}
+
+			if (resultObj.analyzedCsvObj) {
+				setText("#analyzedProfileFile_name", g.operand.analyzedUrl);
+			} else {
+				//setText("#analyzedProfileFile_name","");
+			}
+
+			if (resultObj.errorCsvObj) {
+				setText("#errorFile_name", g.operand.errorUrl);
+			} else {
+				//setText("#errorFile_name","");
+			}
+
+
+			hideCard(["#overlay"]);
+
+			setText("#operandFile_name", file[0].name);
+			console.log(g.operand);
+
+			resultObj = null;
+
+		}
+
+		reader.onerror = function (er) {
+			setText("#operand_name", "Not loaded");
+			hideCard(["#overlay"]);
+		}
+	}
+
+	/* utility functions */
+	/* setProfileTransformConsole */
+	function setProfileTransformConsole(_g) {
+
+		let sections = _g.operand.sectionInfo.map((v, i) => i);
+		let parameters = _g.st.keys;
+		let randomVector = _g.operand.randomVector;
+
+		// DOM 作成: sectionInfo ×randomVector
+		let sectionDiv = d3.select('#console_profile_transform').selectAll('div').data(sections)
+			.enter().append('div')
+			.attr('id', function (d) { return 'console_section_' + d; })
+			.attr('class', 'console')
+			.attr('style', 'display:none');
+
+		// constant parameter 
+		let constantDiv = d3.select('#constant_parameters').selectAll('div').data(sections)
+			.enter().append('div')
+			.attr('id', function (d) { return 'constant_section_' + d; })
+			.attr('class', 'console')
+			.attr('style', 'display:none');
+
+		// toggle button
+		let toggles = d3.select('#toggle_console_wrapper').selectAll('div').data(sections)
+			.enter().append('div')
+			.attr('id', function (d, i) { return 'toggle_' + i; })
+			.attr('class', 'console_toggle_button')
+			.text(function (d, i) { return 'section ' + i; });
+
+		toggles.on('click', function () {
+			d3.selectAll('.console_toggle_button').attr('class', 'console_toggle_button');
+			d3.select(this).attr('class', 'console_toggle_button checked');
+
+			d3.selectAll('.console').attr('style', 'display:none');
+			let sectionNum = d3.select(this).attr('id').split('_')[1];
+			d3.select('#console_section_' + sectionNum).attr('style', 'display:');
+			d3.select('#constant_section_' + sectionNum).attr('style', 'display:');
+		});
+
+		// cooling path graphs
+		let coolingPaths = d3.select('#cooling_path').selectAll('div').data(sections)
+			.enter().append('div')
+			.attr('id', function (d, i) { return 'cooling_graph_' + i; });
+
+		// section number loop
+		let inputDiv = [];
+		let constantParamDiv = [];
+		let coolingDiv = [];
+		for (let i = 0, l = sectionDiv[0].length; i < l; i = (i + 1) | 0) {
+			// input forms
+			inputDiv[i] = d3.select('#console_section_' + i).selectAll('div').data(parameters)
+				.enter().append('div')
+				.attr('id', function (d) { return d + '_' + i; })
+				.attr('class', 'parameter_consoles');
+
+			for (let key of parameters) {
+				let div = d3.select('#' + key + '_' + i);
+				div.append('span')
+					.attr('class', 'discription')
+					.text(key);
+				div.append('input')
+					.attr('max', function (d) { return randomVector[d].max; })
+					.attr('min', function (d) { return randomVector[d].min; })
+					.attr('value', function (d) { return _g.operand.sectionInfo[i][d]; })
+					.on('change', function () {
+						_g.operand.sectionInfo[i][key] = this.value * 1;
+						//console.log(this.value);
+						mcManualDispatch(mcWorkers, _g);
+					})
+			}
+
+			// constant parameters
+			let constantParams = ['temperatureIni', 'temperatureFin', 'coolingTime', 'coolingRate']
+			constantParamDiv[i] = d3.select('#constant_section_' + i).selectAll('div').data(constantParams)
+				.enter().append('div')
+				.attr('id', function (d) { return d + '_' + i; })
+				.attr('class', 'parameter_consoles');
+
+			for (let key of constantParams) {
+				let div = d3.select('#' + key + '_' + i);
+				div.append('span')
+					.attr('class', 'discription')
+					.text(key);
+
+				div.append('span')
+					.attr('class', 'discription value');
+			}
+
+			// cooling path
+			let chartSize = { w: 300, h: 250 };
+			d3.select('#cooling_graph_' + i).append('span')
+				.attr('class', 'discription')
+				.text('Section ' + i);
+
+
+			let list = ['temperature'];
+
+			coolingDiv[i] = d3.select('#cooling_graph_' + i).selectAll('canvas').data(list.concat(g.operand.elementList))
+				.enter().append('canvas')
+				.attr('id', function (d) { return 'cooling_' + d + '_' + i; })
+				.attr('width', chartSize.w)
+				.attr('height', chartSize.h);
+
+		}
+
+	}
+
+	/* operate diffusion */
+
+
+
+	function mcStoreResult(evt) {
+		let data = evt.data;
+		let iter
+		switch (data.cmd) {
+			case 'plot':
+				let island = data.msg.island;
+				iter = data.msg.iteration
+
+				let temperature = data.msg.temperature;
+				//console.log('iteration: '+iter+'; island: '+island+'; lnP: '+data.msg.lnProbability)
+
+				if (island == 0) {
+					let randomFn=new NormalDistribution();
+
+					let resultProfile = []
+					for (let i=0,l=data.msg.profile.x.length;i<l;i++){
+						resultProfile[i]={};
+						g.operand.elementList.map((e)=>{
+							resultProfile[i][e]=data.msg.profile[e][i];
+						})
+						resultProfile[i].x=data.msg.profile.x[i];
+					}
+
+					let noisedProfile;
+					
+					
+					if (document.getElementById('add_noise_switch').checked){
+						noisedProfile=addNoise(resultProfile)(randomFn)(document.getElementById('noise_amplitude').value);
+					}else{
+						noisedProfile=resultProfile;
+					}
+					
+					let radius = data.msg.sectionInfo.map((o)=>o.sectionRadius);
+
+					// プロファイルを描画(実測値とモデル値)
+					g.operand.elementList.map((key, i) => {
+						let model = noisedProfile.map((o) => {
+							return { x: o.x, y: o[key] };
+						});
+						
+						let notDiffusedModel = data.msg.notDiffusedProfile.map((o)=>{
+							return {x:o.x,y:o[key]};
+						})
+
+						let analyzedList = g.analyzedCsvObj.map((o) => {
+							return { x: o.value.x, y: o.value[key] };
+						});
+						gIO.graph.profile[i].reset();
+						
+						// sectionBoundaryを描く
+						for (let r of radius){
+							gIO.graph.profile[i].drawLine({x:r,y:0},{x:r,y:100},{
+								strokeColor : "#888888",
+								lineWidth:0.5
+							})
+						}
+						
+
+						gIO.graph.profile[i].drawMultiPoints(analyzedList, {
+							strokeColor: '#2193f6',
+							fillColor: '#ffffff'
+						});
+
+						gIO.graph.profile[i].drawMultiLines(model);
+
+						
+						gIO.graph.profile[i].drawMultiLines(notDiffusedModel,{
+							strokeColor: "#FF4081"
+						});
+					})
+
+					profileToTable(
+							noisedProfile,
+							g.operand.elementList, 
+							'#profile_table'
+						);
+						
+					profileToTable(
+						data.msg.notDiffusedProfile,
+						g.operand.elementList,
+						'#not_diffused_table'
+					)
+					
+					let diffusers = {};
+					let paths = {};
+					let list = ['temperature'].concat(g.operand.elementList);
+
+					for (let i in temperature) {
+						let tempSet = temperature[i];
+						let realTime = Math.pow(10, g.operand.sectionInfo[i].logCoolTime);
+						let realRate = Math.pow(10, g.operand.sectionInfo[i].logCoolingRate)
+
+						d3.select('#temperatureIni_' + i).select('.discription.value')
+							.text(precision(tempSet[0] - 273.15)(4) + ' C : ' + precision(tempSet[0])(4) + ' K');
+						d3.select('#temperaturefin_' + i).select('.discription.value')
+							.text(precision(tempSet[1] - 273.15)(4) + ' C : ' + precision(tempSet[1])(4) + ' K');
+						d3.select('#coolingTime_' + i).select('.discription.value')
+							.text(precision(realTime / 3.17 * 1e-7)(3) + ' year');
+						d3.select('#coolingRate_' + i).select('.discription.value')
+							.text(precision(realRate * 3.17e7)(3) + ' K/year');
+
+						if (!isNaN(realTime)) {
+							g.operand.elementList.map((e, j) => {
+								diffusers[e] = new Diffusion(e, g.operand.diffusionCoefficient[e]);
+								diffusers[e].setCoolingPath(tempSet, realTime, realRate);
+								paths[e] = diffusers[e].getMaxCompressedTime(1024);
+
+								let l = paths[e].length;
+
+								let pathBoltzman = paths[e].map((v) => { return { x: v.t / 3.17 * 1e-7, y: v.Boltzman } });
+
+								gIO.coolPath[i][e].updateExtent({
+									x: { min: pathBoltzman[0].x, max: pathBoltzman[l - 1].x },
+									y: { min: 0, max: pathBoltzman[0].y }
+								})
+									.resetAll()
+									.drawAxis({
+										xAxis: true,
+										yAxis: true
+									})
+									.drawMultiLines(pathBoltzman, {
+										strokeColor: '#2193f6'
+									});
+
+
+								if (false) {
+									let pathTemp = paths[e].map((v) => { return { x: v.t / 3.17 * 1e-7, y: v.T } });
+									gIO.coolPath[i].temperature.updateExtent({
+										x: { min: pathTemp[0].x, max: pathTemp[l - 1].x },
+										y: { min: 0, max: 2000 }
+									})
+										.resetAll()
+										.drawAxis({
+											xAxis: true,
+											yAxis: true
+										})
+										.drawLine({ x: 0, y: tempSet[1] }, { x: pathTemp[l - 1].x, y: tempSet[1] }, { strokeColor: '#FF4081' })
+										.drawMultiLines(pathTemp, {
+											strokeColor: '#2193f6'
+										});
+
+								}
+
+							})
+						}
+						/*  */
+
+					}
+
+				}
+
+				break;
+
+			default:
+				console.log(data);
+				break;
+
+		}
+
+	}
+
+
+	function mcFirstDispatch(_workers, _g, _invTs) {
+		_workers.map((worker, i) => {
+			worker.postMessage({
+				'cmd': 'initialize', 'msg': {
+					'g': _g,
+					'islandNum': i,
+					'inverseTemperature': _invTs[i],
+					'iterMax': 1
+				}
+			});
+		});
+	}
+
+
+	function mcManualDispatch(_workers, _g) {
+		return new Promise((res, rej) => {
+			_workers.map((worker) => {
+				worker.postMessage({ 'cmd': 'manual', 'msg': { 'g': _g } });
+			});
+			res();
+		});
+	}
+
+	function NormalDistribution(){
+		this.r=new MersenneTwister();
+		
+	}
+
+	NormalDistribution.prototype.next=function(_shift=0,_extend=1){
+		let r1=this.r.next();
+		let r2=this.r.next();
+		return Math.sqrt(-2*Math.log(r1))*Math.cos(2*Math.PI*r2)*_extend+_shift;
+	}
+
+
+	function UniformDistribution(){
+		this.r=new MersenneTwister();
+		
+	}
+
+	UniformDistribution.prototype.next=function(_shift=0,_extend=1){
+		return (2*this.r.next()-1)*_extend+_shift;
+	}
+
+	function addNoise(_profile){
+		return function(_randomFn){
+			return function(_amplitude){
+				let newProfile=[];
+
+				newProfile=_profile.map((point)=>{
+					let newPoint={};
+					for (prop in point){
+						if (prop == 'x') newPoint[prop]=point[prop];
+						else newPoint[prop]=_randomFn.next(point[prop],point[prop]*_amplitude*0.01);
+					}
+					return newPoint;
+				})
+
+				return newProfile;
+			}
+		}
+	}
+
+
+</script>
+</body>

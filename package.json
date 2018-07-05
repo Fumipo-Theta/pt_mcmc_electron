@@ -1,0 +1,29 @@
+{
+  "name": "multiDiffusion",
+  "version": "1.0.0",
+  "description": "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"> <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"> <title>readme</title> <link rel=\"stylesheet\" type=\"text/css\" href=\"http://myapps/fumi_editor/css/blue_head.css\"> <link rel=\"stylesheet\" type=\"text/css\" href=\"http://myapps/fumi_editor/css/editor.css\"> <script src=\"http://myapps/fumi_editor/js/jquery-2.2.0.min.js\" charset=\"utf-8\"></script> <script src=\"http://myapps/fumi_editor/js/jquery-ui.min.js\" charset=\"utf-8\"></script> <script src=\"http://myapps/fumi_editor/js/d3.min.js\" charset=\"utf-8\"></script> <link rel=\"icon\" type=\"image/png\" href=\"http://myapps/fumi_editor/data/logo_material.png\" sizes=\"64x64\"> <style id=\"holderjs-style\" type=\"text/css\"></style></head> <body style=\"cursor: auto;\" class=\" __plain_text_READY__\"> <!-- edit menu --> <div id=\"menu_bar\"><div id=\"upper_menu\"> <div id=\"menu_g1\"> \t<input id=\"button__save_as_file\" class=\"button\" type=\"image\" src=\"http://myapps/fumi_editor/data/ic_save_white_24px.svg\" alt=\"save as file\" title=\"Download html file\" style=\"background-color: #ff0044\"> \t<input id=\"button__edit_start\" class=\"button\" type=\"image\" src=\"http://myapps/fumi_editor/data/ic_create_white_24px.svg\" alt=\"edit start\" title=\"Edit start\"> \t<input id=\"button__edit_end\" class=\"button\" type=\"image\" src=\"http://myapps/fumi_editor/data/ic_done_white_24px.svg\" alt=\"edit end\" title=\"Edit end\"><input id=\"button__item_draggable\" class=\"button\" type=\"image\" src=\"http://myapps/fumi_editor/data/ic_low_priority_white_24px.svg\" alt=\"item draggable\" title=\"Item draggable\" style=\"\">",
+  "main": "next.js",
+  "directories": {
+    "doc": "doc"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "d3": "^5.4.0",
+    "fs.promises": "^0.1.2",
+    "hyperapp": "^1.2.5",
+    "ijavascript-plotly": "0.0.1",
+    "jszip": "^3.1.5",
+    "nodemailer": "^4.6.5",
+    "plotly.js": "^1.38.1"
+  },
+  "devDependencies": {
+    "electron": "^2.0.2",
+    "node-gyp": "^3.6.2"
+  }
+}

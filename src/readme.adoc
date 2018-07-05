@@ -1,0 +1,345 @@
+= Analysis for multiple crystallization and diffusion by PT-MCMC
+:toc: left
+:toclevels: 4
+:icons: font
+:stem: latexmath
+:source-highlighter: coderay
+
+== Usage of electron application
+
+=== Structure of application
+
+The application composed of HTML user interface with event handling by javascript, cluster of WebWorkers calculating MCMC sampling, and a instance of PTMCMC recieving and sending message between WebWorkers. 
+
+The user interface doesnot know detail of PTMCMC and Webworkers.
+Webworkers does not know detail of model and observed data send from PTMCMC. 
+PTMCMC instance does not know operation in MCMC. 
+These structure enables user to concentrate on constructing model.
+
+== Usage of MCMC class
+
+=== Creating model
+
+You can write model and parameters settings as single javascript module. 
+The module must export 4 functions and objects:
+
+model:: Function returning the modeled data
+parameters:: Array composed of objects defining the initial parameters 
+updateCondition:: Objects defining the condition for updating parameters
+constrain:: Objects defining function of constraining parameters
+
+[source,javascript]
+----
+module.exports = {
+  model,
+  parameters,
+  updateConditions,
+  constrain
+}
+----
+
+==== model
+
+The model function recieves array of the model parameters and object of the observed data. 
+It returns modeled data as object. The modeled data has some entries such as "f", "x", "y", and "z". 
+Each of them is array.
+
+Example of model function:
+
+\[
+  f(x,y,z) = a x + b y + c z  
+\]
+
+In the case you have observed data of variable \(x, y, z, f\) and want to estimate parameters \(a, b, c\), model function is like below. 
+
+[source,javascript]
+----
+const model = function(parameters, data){
+
+  const f = function(x,y,z){
+    return parameters[0].a * x
+      + parameters[0].b * y
+      + parameters[0].c * z
+  }
+
+  const modeled = {
+    f : data.f.map((_,i)=>f(data.x[i],data.y[i],data.z[i])),
+    x : data.x,
+    y : data.y,
+    z : data.z,
+  }
+
+  return modeled;
+}
+----
+
+Above, your observed data is expected to have structure like `{f:[],x:[],y:[],z:[]}`.
+
+
+==== parameters
+Array of parameters defines initial model parameters for sampling by MCMC method. 
+It can also define hyeralchical structure among parameters. 
+For example of above model, parameters \(a, b, c\) are 対等 and they are defined in the same object like below.
+
+[source,javascript]
+----
+const parameters = [
+  {
+    a : 0,
+    b : 0,
+    c : 0
+  }
+]
+----
+
+==== updateCondition
+In the MCMC class, the model parameters are update by random walk. 
+The object of updateCondition defines maximum step size of each walk and range of sampling.
+
+[source,javascript]
+----
+const updateCondition = {
+  a : {
+    val : 0.5,
+    max : Infinity,
+    min : Infinity
+  },
+  b : {
+    val : 0.5,
+    max : Infinity,
+    min : Infinity
+  },
+  c : {
+    val : 0.5,
+    max : 100,
+    min : 0
+  }
+}
+----
+
+==== constrain
+If there are constraints among parameters like \(a < b\), you need to define constrain object.
+Each entry of constrain is function receiving candidate value of the parameter in sampling, number of hyeralchy, and array of all parameters.
+It return `true` or `false` by comparing the candidate value and other parameters.
+
+[source,javascript]
+----
+const constrain = {
+  a : function(a, i, parameters){
+    return (a < parameters[i].b)
+  },
+  b : function(b, i, parameters){
+    return (parameters[i].a < b)
+  }
+}
+----
+
+=== Usage of MCMC API
+
+.list of API
+Instance methods::
+  ** constructor
+  ** initialize
+  ** setErrorFunc
+  ** setModel
+  ** setObserved
+  ** randomizeParameters
+  ** sampling
+  ** sampling1set
+  ** samplingAndFormat
+Class methods::
+  ** summarize
+  ** estimateParameter
+
+
+==== constructor
+
+==== initialize
+
+==== setErrorFunc
+
+==== setModel
+
+==== setObserved
+
+==== randomizeParameters
+
+==== sampling
+
+==== sampling1set
+
+==== samplingAndFormat
+
+==== summarize
+
+==== estimatePatameter
+
+== Usage of PTMCMC class
+
+The class of PTMCMC makes easy to execute creating MCMC parallely and to swap them.
+This class provides automatic writing method for result of sampling. 
+You need to prepare observed data and error objects, module of model, and some parameters to tune the parallel-tempering method.
+
+.Example of using PTMCMC class
+[source,javascript]
+----
+// construct instance of PTMCMC
+const ptmcmc = new PTMCMC(
+  output_directory_name,
+  prefix_of_output_csv_file,
+  seed_of_random_number_generator
+)
+
+// Set external action called when some events
+ptmcmc.setAction("initialize",function(ptmcmc,msg){
+  // something to execute when initializing MCMC
+  return msg
+})
+.seAction("plot",function(ptmcmc,msg){
+  // something to execute when recieving sampled parameters
+  return msg
+})
+.setAction("terminate",function(ptmcmc,msg){
+  // something to execute when all sampling is ended
+  return msg
+})
+
+// Set function generating inversed temperature for each MCMC 
+ptmcmc.setInvFunc(/* default is 反比例 function */)
+
+// Create WebWorkers to operate MCMC
+ptmcmc.createChain(
+  number_of_MCMC,
+  path_to_webworker_definition,
+  option /* {alpha : parameter used in calculate inversed temperature} */
+)
+
+// Execute sampling and swaping among MCMCs
+ptmcmc.execute(
+  number_of_sampling,
+  {
+    observed : {
+      data : observed_data,
+      error : error_of_observed_data
+    },
+    model : path_to_model_module
+  }
+)
+----
+
+
+
+=== Usage of PTMCMC API
+
+.list of API
+Instance methods::
+  ** constructor
+  ** createChain
+  ** setAction
+  ** execute
+  ** getAcceptedInfo
+  ** deleteChain
+
+==== constructor
+
+`new PTMCMC(seed? : Number)`
+
+
+The seed is used for generating random number in swapting MCMCs.
+If it is undefined, seed is generated from system time. 
+
+[source,javascript]
+----
+const ptmcmc = new PTMCMC(100)
+----
+
+==== createChain
+
+`createChain(n: Integer, opt: Object, workerPath?: String)`
+
+Create _n_ WebWorkers defined in _workerPath_.
+_workerPath is "./js/mcmcWorker.js" as default.
+
+_opt_ define observed data, path of model module, and parameter of calculating inversed temperature.
+It must have entries: 
+
+[source,javascript]
+----
+{
+  "observed": {
+    "data": Object,
+    "error": Object
+  },
+  "model": String,
+  "alpha": Number
+}
+----
+
+Inversed temperature for each MCMC is calculated by power function as:
+
+\[
+  \frac{1}{T}_i = \left(1+\alpha\right)^{-i}
+\]
+
+In the definition above, the first MCMC has inversed temperature of 0, and it has no effect on sampling. The second and the later MCMC has more small inversed temperature and acceptance probability for each sampling gets higher.
+
+
+==== setAction
+
+`setAction(String: type, Function: f)`
+
+Register external action executed when some events occur.
+The emitting events are:
+
+start:: when MCMC execution starts
+initialize:: when MCMC is ready
+sample:: when recieve sampled result from WebWorker
+terminate:: when sampling of all MCMC is completed
+
+The action is function recieving the instance of PTMCMC and optionally message from WebWorker.
+The return must be the message.
+The action wrapped by Promise internally.
+
+[source,javascript]
+----
+ptmcmc.setAction("sample",function(ptmcmc,message){
+  console.log(ptmcmc);
+  console.log(message);
+  return message;
+})
+
+// action.sample recievs message:
+{
+  id : Number,
+  parameter : [{a:[],b:[],c:[]},{a:[],b:[],c:[]}],
+  lnP : [],
+  accepted : [{a:[],b:[],c:[]},{a:[],b:[],c:[]}],
+  modeled : {x:[],y:[],z:[]}
+}
+
+
+---- 
+
+==== execute
+
+`execute(iteration: Integer, outputPrefix : String)`
+
+Output directory and prefix must be set. They are used in defining output file path. 
+Internally, output path is set as "{_outputPrefix_}-{_numberOfMCMC_}-{_timestamp_}.csv".
+
+[source,javascript]
+----
+ptmcmc.execute(100,"./result/sampled")
+
+/*
+If executed at 2018/0531/11:41:12, 
+output paths are
+./result/sampled-0-2018_0531_114112.csv
+./result/sampled-1-2018_0531_114112.csv
+./result/sampled-2-2018_0531_114112.csv
+*/
+----
+
+==== getAcceptedInfo
+
+==== deleteChain
