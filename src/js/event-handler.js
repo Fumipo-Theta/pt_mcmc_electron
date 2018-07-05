@@ -27,17 +27,18 @@
 
   const dom_totalIteration = document.querySelector("#totalCount");
 
-  const dom_hash = {
+  const dom_input = {
     totalIteration: document.querySelector("#totalCount"),
     iteration: document.querySelector("#iteration_input"),
     workerNum: document.querySelector("#worker_number_input"),
     outputDir: document.querySelector("#output_dir_input"),
+    outputPrefix: document.querySelector("#output_prefix_input"),
     alpha: document.querySelector("#alpha_input"),
     model: document.querySelector("#model_file_name_input")
   }
 
   const initialize = state => {
-    Object.entries(dom_hash).map(([k, dom]) => {
+    Object.entries(dom_input).map(([k, dom]) => {
       dom.value = state[k];
     })
   }
@@ -127,19 +128,19 @@
           publisher.publish("execute", state);
         }, false)
 
-      document.querySelector("#iteration_input")
+      dom_input.iteration
         .addEventListener("change", _ => {
           publisher.publish("change_value", {
-            value: parseInt(document.querySelector("#iteration_input").value),
+            value: parseInt(dom_input.iteration.value),
             key: "iteration",
             state: state
           })
         })
 
-      document.querySelector("#model_file_name_input")
+      dom_input.model
         .addEventListener("change", _ => {
           publisher.publish("change_value", {
-            value: document.querySelector("#model_file_name_input").value,
+            value: dom_input.model.value,
             key: "model",
             state: state,
             "label": "#model_file_name"
@@ -151,10 +152,10 @@
           })
         })
 
-      document.querySelector("#alpha_input")
+      dom_input.alpha
         .addEventListener("change", _ => {
           publisher.publish("change_value", {
-            value: parseFloat(document.querySelector("#alpha_input").value),
+            value: parseFloat(dom_input.alpha.value),
             key: "alpha",
             state: state
           })
@@ -165,10 +166,10 @@
           })
         })
 
-      document.querySelector("#worker_number_input")
+      dom_input.workerNum
         .addEventListener("change", _ => {
           publisher.publish("change_value", {
-            value: parseInt(document.querySelector("#worker_number_input").value),
+            value: parseInt(dom_input.workerNum.value),
             key: "workerNum",
             state: state
           })
@@ -179,19 +180,19 @@
           })
         })
 
-      document.querySelector("#output_dir_input")
+      dom_input.outputDir
         .addEventListener("change", _ => {
           publisher.publish("change_value", {
-            value: document.querySelector("#output_dir_input").value,
+            value: dom_input.outputDir.value,
             key: "outputDir",
             state: state
           })
         })
 
-      document.querySelector("#output_prefix_input")
+      dom_input.outputPrefix
         .addEventListener("change", _ => {
           publisher.publish("change_value", {
-            value: document.querySelector("#output_prefix_input").value,
+            value: dom_input.outputPrefix.value,
             key: "outputPrefix",
             state: state
           })

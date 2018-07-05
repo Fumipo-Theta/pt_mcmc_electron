@@ -14,23 +14,22 @@
  *  in orthopyroxene
  */
 
-importScripts("../../phase/js/geochem.js");
-importScripts("../../phase/js/chemical_profile.js");
-importScripts("../../phase/js/phase.js");
-importScripts("../../phase/js/liquid.js"); // Liquid
-importScripts("../../phase/js/solid.js"); // Solid
-importScripts("../../jslib/matrix/matrix.js");
-importScripts("../../phase/js/equilibrate.js");//Equilibrate
-
-importScripts("../../phase/js/partitioning.js");//D
-importScripts("../../phase/js/exchangePartitioning.js");//KD
-importScripts("../../phase/js/geothermobarometer.js"); //geothermobarometer
-importScripts("../../phase/js/magma-system.js"); // MagmaSystem
-
-importScripts("../../jslib/funcTools.js")
-importScripts("../../diffusion/js/diffusion.js");
-importScripts("../../diffusion/js/inter-diffusion.js"); // InterDiffusion
-importScripts("../../diffusion/js/self-diffusion.js"); // SelfDiffusion*/
+importScripts(
+  "../../../phase/js/geochem.js",
+  "../../../phase/js/chemical_profile.js",
+  "../../../phase/js/phase.js",
+  "../../../phase/js/liquid.js",
+  "../../../phase/js/solid.js",
+  "../../../jslib/matrix/matrix.js",
+  "../../../phase/js/equilibrate.js",
+  "../../../phase/js/partitioning.js",
+  "../../../phase/js/exchangePartitioning.js",
+  "../../../phase/js/geothermobarometer.js",
+  "../../../phase/js/magma-system.js",
+  "../../../jslib/funcTools.js",
+  "../../../diffusion/js/diffusion.js",
+  "../../../diffusion/js/inter-diffusion.js",
+  "../../../diffusion/js/self-diffusion.js"); // SelfDiffusion*/
 //console.log(this);
 
 (function (root, factory) {
@@ -152,9 +151,16 @@ importScripts("../../diffusion/js/self-diffusion.js"); // SelfDiffusion*/
     }
 
 
-    /**
-     * Add or remove small mass fraction of solid phases to/from host melt until a target phase gets equilibrium with the melt. 
-     * Restore composition of phases at each calculation step.
+    /** recordLocalEquilibriumCondition
+     * Simulate transition of the composition of host melt and involved solid phases
+     *   during a reaction of melting or crystallization. 
+     * It starts from a condition where the host melt has a specific composition. 
+     * In each calculation step of, we calculate composition of solid phases 
+     *   by using partitioning coefficient assuming achivement of local equilibrium with host melt.
+     * Then, when crystal growth is considered, small fraction of solid phases are removed from the host melt. 
+     * On the other hand, when assimilation of crystal is considered, they are added to the host melt. 
+     * In the calculation, we use Mg# of some phase as an extent of progression of the reaction.
+     * Until Mg# of the focused phase becomes a given value, the steps are repeated. 
      * 
      * @param {*} magma 
      * @param {*} observedPhaseName 
@@ -172,7 +178,7 @@ importScripts("../../diffusion/js/self-diffusion.js"); // SelfDiffusion*/
      *  true
      * )
      */
-    const moveCrystalBoundary = (
+    const recordLocalEquilibriumCondition = (
       magma, observedPhaseName, targetMgN, stoichiometry, dF, isRecord
     ) => {
       const melt = magma.phase.melt;
@@ -181,8 +187,10 @@ importScripts("../../diffusion/js/self-diffusion.js"); // SelfDiffusion*/
       let { T, P } = magma.getThermodynamicProperty();
       observedPhase.equilibrate("melt", T, P)
 
-      const sign = (observedPhase.getMgNumber() < targetMgN) ? 1. : -1.;
-      const pathName = (observedPhase.getMgNumber() < targetMgN) ? "ascend" : "descend";
+      const { sign, pathName } = (observedPhase.getMgNumber() < targetMgN)
+        ? { sign: 1., pathName: "ascend" }
+        : { sign: -1., pathName: "descend" };
+
       const isOver = compare(targetMgN, sign);
       const isInRange = inRange(-1, 1);
       let F = 0;
@@ -192,6 +200,7 @@ importScripts("../../diffusion/js/self-diffusion.js"); // SelfDiffusion*/
         phase.resetProfile(pathName);
       })
 
+      // repeat until Mg# of targetPhase exceeds targetMgN or F becomes out of range [0,1]
       while (isInRange(F) && !isOver(observedPhase.getMgNumber())) {
         let { T, P } = magma.getThermodynamicProperty();
 
@@ -277,13 +286,26 @@ importScripts("../../diffusion/js/self-diffusion.js"); // SelfDiffusion*/
       })
 
       // 初生的なメルト組成を計算
-      moveCrystalBoundary(magma, targetPhase, ini, stoichiometry, dF, true)
+      recordLocalEquilibriumCondition(magma, targetPhase, ini, stoichiometry, dF, true)
 
       return {}
     }
 
-    /**
+    /** 
+     * Crystals grow in the host melt which is already set composition.
+     * Composition of growing part of crystals are calculated by mass balance equation with partitioning coefficients 
+     *   by assuming establishment of local equilibrium.
+     * Once the part of crystal grows, it no longer has effect on the part of growing crystal after it.
+     * Therefore, the condition of crystal growth is Rayleigh fractionation. 
      * 
+     * Considered solid phases are: 
+     *  1. olivine
+     *  2. orthopyroxene
+     *  3. spinel
+     * Reaction stoichiometry of solid phases are constant. 
+     * In this method, stoichiometry of orthopyroxene and spinel are given. 
+     * 
+     * Crystal grow until Mg# of a given phase reach a specific value. 
      */
     const growCrystals = (magma, ope, result) => {
       const {
@@ -301,7 +323,7 @@ importScripts("../../diffusion/js/self-diffusion.js"); // SelfDiffusion*/
       }
 
       // 結晶成長を伴うメルト組成変化
-      moveCrystalBoundary(magma, targetPhase, fin, stoichiometry, dF, true)
+      recordLocalEquilibriumCondition(magma, targetPhase, fin, stoichiometry, dF, true)
       return {}
     }
 
