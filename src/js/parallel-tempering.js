@@ -11,7 +11,7 @@
   }
 }(this, function (_mt, _JSZip) {
 
-  const localStorage = {};
+  const localFile = {};
 
   const mt = (typeof require === 'undefined' && (typeof _mt === 'object' || typeof _mt === 'function'))
     ? _mt
@@ -26,10 +26,10 @@
   const fs = (typeof require === 'undefined')
     ? {
       writeFile: async (path, content) => {
-        localStorage[path] = [content]
+        localFile[path] = [content]
       },
       appendFile: async (path, content) => {
-        localStorage[path].push(content)
+        localFile[path].push(content)
       }
     }
     : require("fs.promises")
@@ -529,7 +529,7 @@
       const zip = new JSZip();
       const ts = [...this.timestamp].pop()
       const folder = zip.folder(ts);
-      Object.entries(localStorage)
+      Object.entries(localFile)
         .filter(([k, v]) => k.match(ts) !== null)
         .map(([k, v]) => {
           folder.file(k, v.reduce((a, b) => a + b))
