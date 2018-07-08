@@ -204,7 +204,7 @@ importScripts(
       })
 
       // repeat until Mg# of targetPhase exceeds targetMgN or F becomes out of range [0,1]
-      let limmit = 0
+      let limit = 0
       while (isInRange(F) && !isExceed(observedPhase.getMgNumber())) {
         let { T, P } = magma.getThermodynamicProperty();
 
@@ -253,8 +253,8 @@ importScripts(
             entry[1].equilibrate("melt", T, P)
           })
 
-          limmit++
-          if (limmit > 100) break;
+          limit++
+          if (limit > 100) break;
         }
         //=========================
 
@@ -481,7 +481,7 @@ importScripts(
      * 
      */
     const magma = new MagmaSystem()
-    magma.setThermodynamicAgent(createPhase())
+    magma
       .setThermodynamicHandler(
         (magma, opt) => {
           const P = magma.barometer();
@@ -530,6 +530,7 @@ importScripts(
      *  @property {Array} Cr2O3
      */
     const model = (parameters, data) => {
+      magma.setThermodynamicAgent(createPhase())
 
       const modelParameters = parameters.map((p, i) => {
         return [

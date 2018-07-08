@@ -95,5 +95,7 @@ this.addEventListener("message", function (ev) {
       console.log(data)
       break;
   }
+
+  ev.data = null;
 }, false)
 
