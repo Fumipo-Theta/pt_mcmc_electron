@@ -107,6 +107,7 @@
           state.totalIteration = 0;
           state.isDirty = false;
           state.colorMap = palette("tol-rainbow", state.workerNum)
+          state.acceptedTime = []
         }
 
         state.totalIteration += parseInt(state.iteration);

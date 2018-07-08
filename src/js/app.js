@@ -22,15 +22,49 @@
     : require("../src/js/plot-after-event.js");
 
   const dom_currentIteration = document.querySelector("#presentCount");
+  const dom_acceptedTable = document.querySelector("#accepted_table table");
+  const dom_exchangeTable = document.querySelector("#exchange_table table");
+
+  const updateTable = (dom_table, tbodyArray, thead = [], tbodyHead = []) => {
+    const dom_thead = dom_table.querySelector("thead");
+    const dom_tbody = dom_table.querySelector("tbody");
+
+    if (thead.length > 0) {
+      dom_thead.innerHTML = `<thead><th></th>${thead.map(v => `<th>${v}</th>`).reduce((a, b) => a + b, "")}</thead>`
+    }
+
+    dom_tbody.innerHTML = `<tbody>
+    ${tbodyArray.map((rowAsArray, i) => {
+        const th = (tbodyHead[i] === undefined) ? "" : tbodyHead[i]
+        return `<tr>
+        <th>${th}</th>
+        ${rowAsArray.map(v => `<td>${v}</td>`).reduce((a, b) => a + b, "")}
+      </tr>`
+      }).reduce((a, b) => a + "\n" + b, "")}
+    </tbody>`
+
+  }
 
 
   const updateAcceptedRate = (ptmcmc, state, msg) => {
     state.acceptedTime[msg.id] = msg.accepted;
+    if (msg.id === 0) updateTable(
+      dom_acceptedTable,
+      msg.accepted.map(paramSet => Object.values(paramSet)),
+      Object.keys(msg.accepted[0]),
+      msg.accepted.map((_, i) => "parameter set " + i)
+    )
   }
 
   const updateExchangeRate = (ptmcmc, state, msg) => {
     dom_currentIteration.innerHTML = ptmcmc.totalIteration;
+    updateTable(
+      dom_exchangeTable,
+      [ptmcmc.exchangeTime],
+      Array(state.workerNum - 1).fill(0).map((_, i) => `${i}-${i + 1}`)
+    )
   }
+
 
   const state = (typeof require === 'undefined' && (typeof _state === 'object' || typeof _state === 'function'))
     ? _state
