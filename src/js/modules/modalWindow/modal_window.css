@@ -1,7 +1,12 @@
 
 	/* スクロールバー */
+:root{
+	--box-shadow-pale: 0px 2px 7px 0 var(--box-shadow-color);
 
-	
+  --box-shadow-dense: 0 5px 10px 0 var(--box-shadow-color), 
+              0 10px 25px 0 var(--box-shadow-color);
+}
+
 ::-webkit-scrollbar {
     width: 5px;
 }
@@ -379,7 +384,7 @@ li > .olist{
   padding: 10px;
   box-shadow: var(--box-shadow-pale);
   display: flex;
-  justify-content : center;
+  /*justify-content : center;*/
 }
 
 .render_markdown table.tableblock,

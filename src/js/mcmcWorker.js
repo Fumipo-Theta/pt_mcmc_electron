@@ -10,6 +10,11 @@ const observer = {}
 const self = this;
 let __model_optional_parameters__ = {}
 
+function replacer(k, v) {
+  if (typeof v === "function") { return v.toString() };
+  return v;
+}
+
 this.postMessage({ cmd: "", msg: "subprocess loaded" })
 
 this.addEventListener("message", function (ev) {
@@ -26,7 +31,7 @@ this.addEventListener("message", function (ev) {
         parameters,
         updateCondition,
         constrain
-      } = Model(msg.option)
+      } = __model__ = Model(msg.option)
 
 
       //console.log(model)
@@ -48,11 +53,12 @@ this.addEventListener("message", function (ev) {
           model
         )
 
-      self.postMessage({ "cmd": "", msg: "initialized" + observer.id })
+
       self.postMessage({
         "cmd": "initialize", "msg": {
           "id": observer.id,
-          "parameter": parameters
+          "parameter": parameters,
+          "model": JSON.stringify(__model__, replacer, 2)
         }
       })
       break;

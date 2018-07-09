@@ -288,32 +288,55 @@ th{
 
 		.file_select li{
 			display: flex;
-			margin: 10px 0;
+      margin: 10px 0;
+      align-items: center;
 		}
 		
 			.instruction{
-				flex: 3;
-				min-width: 200px;
-			}
-			
+				min-width: 300px;
+      }
+      
+    
 			.input_element{
-				flex: 2;
-				min-width: 200px;
+				min-width: 300px;
 				padding: 10px;
 			}
 			
-			.filename{
-				flex: 1;
-				min-width: 200px;
-				padding: 10px ;
-			}
+			.fileName{
+				min-width: 300px;
+        padding: 10px ;
+        cursor: pointer;
+      }
+
+      .fileName:hover::after{
+        font-family: "FontAwesome";
+        content:"\f05a";
+        margin-left:5px;
+        width:20px;
+        height:20px;
+      }
+      
+      .show-modal{
+				min-width: 100px;
+        padding: 10px ;
+        cursor: pointer;
+      }
+
+      .show-modal:hover::after{
+        font-family: "FontAwesome";
+        content:"\f05a";
+        margin-left:5px;
+        width:20px;
+        height:20px;
+      }
 
 	.form_right{
 	}
 
 
 label.file,
-label.button{
+label.button,
+span.button{
 	cursor: pointer;
 	font-size: 1.2rem;
 	margin: 10px 10px;
@@ -347,8 +370,6 @@ input{
 
 input[type="text"],
 input[type="number"]{
-	margin-left: 20px;
-	margin-right: 20px;
 	border: none;
 	border-bottom: 1px solid var(--accent-color);
 }

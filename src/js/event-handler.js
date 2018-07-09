@@ -29,16 +29,47 @@
     ? _ModalMedia
     : require("./modal-media");
 
+
+  const df2table = df => {
+    const thead = Object.keys(df);
+    const data = Object.values(df);
+    const tbody = []
+
+    for (let i = 0, l = data[0].length; i < l; i++) {
+      tbody[i] = [];
+      for (let entry of data) {
+        tbody[i].push(entry[i]);
+      }
+    }
+
+    return "<table class='tableblock'>"
+      + `<thead>${thead.map(v => `<th>${v}</th>`).reduce((a, b) => a + b, "")}</thead>`
+      + `<tbody>
+    ${tbody.map((rowAsArray, i) => {
+        return `<tr>
+        ${rowAsArray.map(v => `<td>${v}</td>`).reduce((a, b) => a + b, "")}
+      </tr>`
+      }).reduce((a, b) => a + "\n" + b, "")}
+    </tbody></table>`
+
+  }
+
+  /**
+   * 
+   * Workerからmodelなどをstringifyして受け取ったものをmarkdownのコードブロックとして表示する.
+   * data.replace(/\\r\\n/g, "\n").replace(/\\["']/g, "").replace(/"/g, "")は,
+   * 余分な改行を削除,
+   * クォーテーションマークを削除, 
+   * することでFunction.toString()されたも含めてjavascriptコードとして認識されるようにしている
+   * 
+   * @param {String} data 
+   * @param {String} title 
+   */
+  const data2md_code = (data, title = "") => '## ' + title + '\n```javascript\n' + data.replace(/\\r\\n/g, "\n").replace(/\\"/g, "").replace(/"/g, "") + '\n```'
+
   const { media, modalWindowPublisher } = ModalMedia(
     document.querySelector("#modal_container"),
     document.querySelector("#modal_window")
-  )
-
-  document.querySelector("#readme").addEventListener("click",
-    ev => {
-      modalWindowPublisher.publish("open");
-      media.show("../doc/readme.adoc")
-    }
   )
 
   const dom_totalIteration = document.querySelector("#totalCount");
@@ -52,6 +83,16 @@
     alpha: document.querySelector("#alpha_input"),
     model: document.querySelector("#model_file_name_input")
   }
+
+  const dom_show = {
+    readme: document.querySelector("#readme"),
+    model: document.querySelector("#show_model"),
+    option: document.querySelector("#option_file_name"),
+    data: document.querySelector("#data_file_name"),
+    error: document.querySelector("#error_file_name")
+  }
+
+
 
   const initialize = state => {
     Object.entries(dom_input).map(([k, dom]) => {
@@ -260,6 +301,49 @@
           })
         }, false)
 
+      /**
+       * modal windowへの表示
+       */
+      dom_show.model.addEventListener("click",
+        ev => {
+          modalWindowPublisher.publish("open");
+          media.show(data2md_code(state.__model__, "Model"))
+        },
+        false
+      )
+
+      dom_show.readme.addEventListener("click",
+        ev => {
+          modalWindowPublisher.publish("open");
+          media.show("../doc/readme.adoc")
+        },
+        false
+      )
+
+      dom_show.option.addEventListener("click",
+        ev => {
+          modalWindowPublisher.publish("open");
+          media.show(data2md_code(JSON.stringify(state.option, null, 2), "External parameters"));
+        },
+        false
+      )
+
+
+      dom_show.data.addEventListener("click",
+        ev => {
+          modalWindowPublisher.publish("open");
+          media.show(df2table(state.data));
+        },
+        false
+      )
+
+      dom_show.error.addEventListener("click",
+        ev => {
+          modalWindowPublisher.publish("open");
+          media.show(df2table(state.error));
+        },
+        false
+      )
     }
   }
 }))

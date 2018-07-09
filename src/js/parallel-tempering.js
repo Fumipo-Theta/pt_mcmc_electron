@@ -271,7 +271,7 @@
               .then(_ => res(_))
 
             break;
-          case "initialized":
+          case "initialize":
             self.action.initialize(self)(msg)
               .then(_ => res(_))
             break;

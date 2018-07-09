@@ -62,7 +62,7 @@
     <div class="inner_card">
       <ul>
         <li>
-          <span id="readme">Read me
+          <span id="readme" class="show-modal button">Read me
             <span>
         </li>
       </ul>
@@ -102,10 +102,10 @@
           <li>
             <span class="instruction">Model file (.js)</span>
 
-            <input type="text" id="model_file_name_input" value="">
+            <input type="text" id="model_file_name_input" class="input_element" value="" style="width:300px;">
 
+            <span id="show_model" class="show-modal button">show</span>
 
-            <span id="model_file_name" class="fileName"></span>
           </li>
 
           <li>
@@ -117,6 +117,7 @@
                 <input type="file" accept=".json" id="option_file_select" style="display:none">
               </label>
             </span>
+            <!--span id="show_option" class="show-modal button">show</span-->
             <span id="option_file_name" class="fileName">test data</span>
           </li>
 
@@ -128,7 +129,9 @@
                 <input type="file" accept=".csv" id="data_file_select" style="display:none">
               </label>
             </span>
+            <!--span id="show_data" class="show-modal button">show</span-->
             <span id="data_file_name" class="fileName">test data</span>
+
           </li>
 
           <li>
@@ -139,7 +142,9 @@
                 <input type="file" accept=".csv" id="error_file_select" style="display:none">
               </label>
             </span>
+            <!--span id="show_error" class="show-modal button">show</span-->
             <span id="error_file_name" class="fileName">test data</span>
+
           </li>
 
 
@@ -170,10 +175,6 @@
             <span class="input_element">
               <input id="alpha_input" type="number" value="0" min="0" required style="width: 10rem">
             </span>
-          </li>
-          <li>
-            Send me e-mail !
-            <input id="mail_notice_flag" type="checkbox">
           </li>
         </ul>
       </div>

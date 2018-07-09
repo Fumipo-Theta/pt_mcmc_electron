@@ -28,7 +28,8 @@
     "exchangedTime": [],
     "primalyKey": "x",
     "colorMap": [],
-    "option": {}
+    "option": {},
+    "__model__": ""
   }
 
   return state;
