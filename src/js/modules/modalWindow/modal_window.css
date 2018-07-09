@@ -1,0 +1,462 @@
+
+	/* スクロールバー */
+
+	
+::-webkit-scrollbar {
+    width: 5px;
+}
+ 
+::-webkit-scrollbar-track {
+    background-color: none;
+}
+ 
+::-webkit-scrollbar-thumb {
+		background-color: #2196f3;
+}
+
+
+
+.render_markdown{
+  background-color: var(--bg-color);
+  font-size: var(--base-font-size);
+  width: 90%;
+  height: 95%;
+  max-width: 1600px;
+  max-height: 1200px;
+  padding: 1;
+}
+
+.render_markdown .toc{
+  background-color : var(--toc-bg-color);
+  color : var(--text-color);
+	font-size: var(--toc-font-ratio);
+	padding: 20px;
+	
+}
+
+.render_markdown .toc li{
+  list-style-type: none;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.render_markdown .sectionbody{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.render_markdown .sectionbody > *{
+  min-width: 70%;
+  max-width: 90%;
+}
+
+.render_markdown > *{
+  margin-left: 20px;
+  margin-right: 20px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+}
+
+.render_markdown div.title{
+  color : var(--caption-color);
+  font-family: serif;
+  display: flex;
+  /*justify-content: center;*/
+  margin-bottom: 15px;
+}
+
+.render_markdown caption{
+  color : var(--caption-color);
+  font-family: serif;
+}
+
+
+.render_markdown img{
+	max-width: 100%;
+  max-height: 100%;
+  /*box-shadow: var(--box-shadow-pale);*/
+}
+
+/* Top level section: 通常のスライド1枚に対応 */
+.render_markdown #preamble,
+.render_markdown .sect1,
+.render_markdown .sect2{
+    /*padding-top: 80px;*/
+    padding-bottom: 80px;
+    border-bottom: 0.5px solid var(--vague-border-color);
+    min-height: 100%;
+}
+
+.render_markdown .sect2{
+    padding-top: 60px;
+    padding-bottom: 60px;
+    border: none;
+}
+
+
+/* スライドのタイトル */
+.render_markdown h1{
+  background-color: var(--head-color);
+  color: var(--title-color);
+  font-size: var(--h1-font-ratio);
+  margin: 0;
+  padding: 5px 0;
+  text-align: center;
+}
+
+
+/* スライドのサブセクションヘッダ 
+  スクロースしてh2がモーダルウィンドウのtopにくると, 
+  次のh2が来るまで固定される.
+*/
+.render_markdown > .sect1 > h2{
+  position: sticky;
+  top:0;
+}
+
+.render_markdown h2{
+  color: var(--head-color);
+  background-color: var(--bg-color);
+  font-size: var(--h2-font-ratio);
+  margin-top:30px;
+  margin-bottom: 30px;
+}
+
+.render_markdown h3{
+  color : var(--text-color);
+  font-size: var(--base-font-size);
+  margin-top:30px;
+  margin-bottom: 30px;
+}
+
+
+/* 強調色 */
+.render_markdown strong{
+  color: var(--strong-color);
+  font-weight: bold;
+}
+
+.render_markdown > a,
+.render_markdown > a:visited{
+	color: var(--link-color);
+}
+
+.admonitionblock > table {
+    border-collapse: separate;
+    font-size: var(--base-font-size);
+    margin: 30px auto;
+    border: 0;
+    background: none;
+    width: 100%;
+}
+
+.admonitionblock > table td{
+  color: var(--text-color);
+  background: none;
+  border:none;
+} 
+
+.admonitionblock > table td.icon {
+  text-align: center;
+  width: 2.5em;
+}
+
+.admonitionblock > table td.content {
+  border-left: 1px solid var(--vague-border-color);
+  padding-left: 20px;
+}
+
+
+
+.fa {
+    display: inline-block;
+    font: normal normal normal 14px/1 FontAwesome;
+    font-size: inherit;
+    text-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.admonitionblock td.icon .icon-note:before {
+    content: "\f05a";
+    color: #19407c;
+}
+
+.admonitionblock td.icon [class^="fa icon-"] {
+    font-size: 1.5em;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    cursor: default;
+}
+
+.admonitionblock td.icon .icon-tip:before {
+    content: "\f0eb";
+    text-shadow: 1px 1px 2px rgba(155, 155, 0, 0.8);
+    color: #111;
+}
+
+.admonitionblock td.icon .icon-important:before{
+    content: "\f06a";
+    color: #bf0000;
+}
+
+.admonitionblock td.icon .icon-warning:before {
+    content: "\f071";
+    color: #bf6900;
+}
+
+
+.admonitionblock td.icon .icon-caution:before {
+    content: "\f06d";
+    color: #bf3400;
+}
+
+.render_markdown .toc a,
+.render_markdown h1 a,
+.render_markdown h2 a,
+.render_markdown h3 a{
+  color: inherit;
+	text-decoration: none;
+}
+
+
+.render_markdown blockquote{
+  color : var(--text-color);
+  border-left: 10px solid var(--quote-border-color);
+  padding-left: 20px;
+}
+
+.render_markdown p{
+  color : var(--text-color);
+  margin-top:20px;
+  margin-bottom: 20px;
+  padding-left:40px;
+  overflow-wrap: break-word; 
+}
+
+.render_markdown pre{
+  background-color: var(--code-bg-color);
+  border-radius: 5px;
+  font-size: var(--code-font-ratio);
+  margin-left: 50px;
+  padding: 10px;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.render_markdown li > code,
+.render_markdown p > code{
+  background-color: var(--code-bg-color);
+  border-radius: 5px;
+  font-size: var(--code-font-ratio);
+  padding: 3px;
+  overflow-x: auto;
+}
+
+.render_markdown object,
+.render_markdown iframe{
+  display: block;
+  border: none;
+  width: 90%;
+  height: 80%;
+  margin: 50px auto;
+  overflow: auto;
+  box-shadow: var(--box-shadow-pale);
+}
+
+.render_markdown li{
+  color: var(--text-color);
+}
+
+.render_markdown .sectionbody > .dlist,
+.render_markdown .sectionbody > .ulist,
+.render_markdown .sectionbody > .olist{
+  margin-top: 50px;
+  margin-bottom : 50px;
+}
+
+
+.render_markdown dt{
+  font-size: 1.2em;
+  color: var(--list-bg-color);
+}
+
+li > .dlist,
+li > .ulist,
+li > .olist{
+  margin-top: 20px;
+  margin-bottom : 20px;
+}
+
+.render_markdown dl.dense  p,
+.render_markdown ul.dense  p,
+.render_markdown ol.dense  p{
+  color : var(--text-color);
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+/*
+  Simple flat designed list items
+*/
+
+.render_markdown .dlist.simple,
+.render_markdown .ulist.simple,
+.render_markdown .olist.simple{
+  width: 90%;
+}
+
+.render_markdown dl.simple,
+.render_markdown ul.simple,
+.render_markdown ol.simple{
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.render_markdown dl.simple  li,
+.render_markdown ul.simple  li,
+.render_markdown ol.simple  li {
+    display: flex;
+    justify-content: center;
+    /* align-items: center; */
+    list-style-type: none;
+    width: 80%;
+    margin: 0;
+    color: var(--text-color);
+    -webkit-margin-after: 0;
+}
+
+.render_markdown dl.simple  li > p,
+.render_markdown ul.simple  li > p,
+.render_markdown ol.simple  li > p{
+    background-color: var(--list-bg-color);
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 30px;
+}
+
+.render_markdown dl.simple  li  dl  p,
+.render_markdown ul.simple  li  ul  p,
+.render_markdown ol.simple  li  ol  p{
+    background-color: var(--list-vague-bg-color);
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 30px;
+}
+
+.render_markdown dl.simple  li > .dlist,
+.render_markdown dl.simple  li > .ulist,
+.render_markdown dl.simple  li > .olist,
+.render_markdown ul.simple  li > .dlist,
+.render_markdown ul.simple  li > .ulist,
+.render_markdown ul.simple  li > .olist,
+.render_markdown ol.simple  li > .dlist,
+.render_markdown ol.simple  li > .ulist,
+.render_markdown ol.simple  li > .olist{
+  flex: 2;
+}
+
+.render_markdown li p{
+  color : var(--text-color);
+  margin-top: 10px;
+  margin-bottom: 10px;
+  padding: 20px;
+  padding-left: 0;
+}
+
+.render_markdown .table_wrapper{
+  max-width: 90%;
+  max-height: 80%;
+  margin: 50px auto;
+  overflow: auto;
+  padding: 10px;
+  box-shadow: var(--box-shadow-pale);
+  display: flex;
+  justify-content : center;
+}
+
+.render_markdown table.tableblock,
+.render_markdown > table{
+  font-size: 24px;;
+  border-collapse: collapse;
+}
+
+/*
+.render_markdown .tableblock tbody,
+.render_markdown > table tbody{
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(0, 0, 0, 0.2))  100% 0/2rem, linear-gradient(to top, rgba(255, 255, 255, 0), rgba(0, 0, 0, 0.2))  100% bottom/2rem;
+    background-repeat: no-repeat;
+    background-attachment: scroll;
+    -webkit-overflow-scrolling: touch;
+}
+
+.render_markdown .tableblock tbody > tr:first-child,
+.render_markdown > table tbody > tr:first-child {
+    background: linear-gradient(to top, rgba(255, 255, 255, 0), #fff);
+  }
+
+.render_markdown .tableblock tbody > tr:last-child,
+.render_markdown > table tbody > tr:last-child {
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #fff);
+  }
+*/
+
+.render_markdown .tableblock th,
+.render_markdown .tableblock td,
+.render_markdown > table th,
+.render_markdown > table td{
+  padding: 5px 10px;
+  color: var(--text-color);
+  font-family: serif;
+}
+
+.render_markdown .tableblock th,
+.render_markdown > table th{
+   border-top : 3px solid var(--strong-border-color);
+   border-bottom: 3px solid var(--strong-border-color);
+   font-weight: bold;
+}
+
+.render_markdown .tableblock td,
+.render_markdown > table td{
+  border: 1px solid var(--vague-border-color);
+}
+
+.render_markdown .tableblock th:nth-child(odd),
+.render_markdown .tableblock td:nth-child(odd),
+.render_markdown table th:nth-child(odd),
+.render_markdown table td:nth-child(odd){
+  background-color: var(--table-odd-bg-color);
+}
+
+.render_markdown .tableblock th:nth-child(even),
+.render_markdown .tableblock td:nth-child(even),
+.render_markdown table th:nth-child(even),
+.render_markdown table td:nth-child(even){
+  background-color: var(--table-even-bg-color);
+}
+
+.render_markdown .error_message{
+  font-size: 2em;
+  color: red;
+  background-color: black;
+}
+
+.render_markdown div.content{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.render_markdown div.graphviz svg{
+  min-width: 600px;
+  max-width: 1000px;
+  min-height: 450px;
+}

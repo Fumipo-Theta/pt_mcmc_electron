@@ -7,10 +7,11 @@
     root.eventHandler = factory(
       root.PubSub,
       root.textFile,
-      root.palette
+      root.palette,
+      root.ModalMedia
     );
   }
-}(this, function (_PubSub, _tf, _palette) {
+}(this, function (_PubSub, _tf, _palette, _Modal_Media) {
 
   const { Publisher, Subscriber } = (typeof require === 'undefined' && (typeof _PubSub === 'object' || typeof _PubSub === 'function'))
     ? _PubSub
@@ -24,6 +25,21 @@
     ? _palette
     : require("../../../jslib/palette.js");
 
+  const ModalMedia = (typeof require === 'undefined' && (typeof _ModalMedia === 'object' || typeof _ModalMedia === 'function'))
+    ? _ModalMedia
+    : require("./modal-media");
+
+  const { media, modalWindowPublisher } = ModalMedia(
+    document.querySelector("#modal_container"),
+    document.querySelector("#modal_window")
+  )
+
+  document.querySelector("#readme").addEventListener("click",
+    ev => {
+      modalWindowPublisher.publish("open");
+      media.show("../doc/readme.adoc")
+    }
+  )
 
   const dom_totalIteration = document.querySelector("#totalCount");
 

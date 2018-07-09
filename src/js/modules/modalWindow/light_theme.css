@@ -1,0 +1,228 @@
+/*
+  カラーテーマについて
+
+*/
+
+:root {
+    --bg-color: white;
+    --toc-bg-color: rgba(180,180,200,0.4);
+    --head-color : #0e096f;
+    --text-color : black;
+        --caption-color : #aa0000;
+    --title-color: white;
+    --quote-border-color: #395266;
+    --code-bg-color: #c6cfc7;
+    --table-even-bg-color:#f2f2f2;
+    --table-odd-bg-color:#fefefe;
+    --strong-border-color: black;
+    --vague-border-color: #bbbbbb;
+    --strong-color: #d70045;
+    --link-color: blue;
+    --list-bg-color: #4292e7;
+    --list-vague-bg-color: #8cc0f8;
+    --box-shadow-color: rgba(0,0,0,0.5); 
+    --box-shadow-dense-color: rgba(0,0,0,0.9); 
+
+    --base-font-size: 32px;
+    --toc-font-ratio: 0.8em;
+    --code-font-ratio: 0.75em;
+    --h1-font-ratio: 1.5em;
+    --h2-font-ratio: 1.5em;
+
+    --node-bg-color:rgba(255,255,255,0.75);
+
+    --node-active-color:#2196f3;
+    --node-refered-color: rgba(175, 58, 93, 0.75);
+
+    --theory-bg-color:#0bbb00;
+    --theory-border-color: #5efb6a;
+    --theory-border: 1px;
+    --data-bg-color: #95ff9e;
+    --data-border-color: #30b534;
+    --data-border: 1px;
+    --model-bg-color: #8eaae6;
+    --model-border-color: #34608d;
+    --model-border: 3px;
+    --inference-bg-color: #cfcfcf;
+    --inference-border-color: #949494;
+    --inference-border: 1px;
+    --premise-bg-color: #91c6ff;
+    --premise-border-color: #8a93ff;
+    --premise-border: 1px;
+
+}
+
+
+#viewer .link{
+  stroke-width:1px;  
+  transition: all 0.1s;
+}
+
+#viewer .link text{
+  fill: gray;
+}
+
+#viewer .link.active{
+  stroke-width: 2px;
+  stroke: var(--node-active-color);
+}
+
+#viewer .link.refered{
+  stroke-width: 2px;
+  stroke: var(--node-refered-color);
+}
+
+#viewer .node circle{
+  transition: all 0.075s;
+}
+
+#viewer .node text{
+  fill: var(--text-color);
+}
+
+#viewer .node circle.fixed{
+  box-shadow: none;
+}
+
+#viewer .node .theory{
+  fill : var(--theory-bg-color);
+  stroke: var(--theory-border-color);
+  stroke-width: var(--theory-border);
+}
+
+#viewer .node circle.active{
+  stroke: var(--node-active-color) !important; 
+  stroke-width: 10px !important;
+  transition: all 0.1s;
+}
+
+#viewer .node circle.refered{
+  opacity :0.75;
+  fill: var(--node-refered-color) !important;
+  transition: all 0.1s;
+}
+
+#viewer .node circle.deactive{
+  opacity: 0.3;
+  background-color: var(--bg-color);
+  transition: all 0.1s;
+}
+
+#viewer div.node{
+  color: var(--text-color);
+  background-color: var(--node-bg-color);
+}
+
+#viewer div.node.active{
+  border: 10px solid var(--node-active-color) !important;
+  transition: all 0.1s; 
+}
+
+#viewer div.node.refered{
+  border: 10px dashed var(--node-refered-color) !important;
+  transition: all 0.1s; 
+}
+
+#viewer div.node.deactive{
+  box-shadow: none !important; 
+  transition: all 0.1s; 
+}
+
+#viewer div.node.theory{
+  /*background-color : var(--theory-bg-color);
+  */
+  box-shadow: 0 0 30px 10px var(--theory-bg-color) inset;
+  border: var(--theory-border) solid var(--theory-border-color);
+  border-radius: 5px;
+}
+
+#viewer .node .data{
+  fill : var(--data-bg-color);
+  stroke: var(--data-border-color);
+  stroke-width: var(--data-border);
+}
+
+#viewer div.node.data{
+  /*background-color : var(--data-bg-color);
+  */
+  box-shadow: 0 0 30px 10px var(--data-bg-color) inset;
+  border: var(--data-border) solid var(--data-border-color);
+  border-radius: 5px;
+}
+
+#viewer .node .model{
+  fill : var(--model-bg-color);
+  stroke: var(--model-border-color);
+  stroke-width: var(--model-border);
+}
+
+#viewer div.node.model{
+  /*background-color : var(--model-bg-color);
+  */
+  box-shadow: 0 0 30px 10px var(--model-bg-color) inset;
+  border: var(--model-border) solid var(--model-border-color);
+  border-radius: 5px;
+}
+
+#viewer .node .inference{
+  fill : var(--inference-bg-color);
+  stroke: var(--inference-border-color);
+  stroke-width: var(--inference-border);
+}
+
+#viewer div.node.inference{
+  /*background-color : var(--inference-bg-color);
+  */
+  box-shadow: 0 0 30px 10px var(--inference-bg-color) inset;
+  border: var(--inference-border) solid var(--inference-border-color);
+  border-radius: 5px;
+}
+
+#viewer .node .premise{
+  fill : var(--premise-bg-color);
+  stroke: var(--premise-border-color);
+  stroke-width: var(--premise-border);
+}
+
+#viewer div.node.premise{
+  /*background-color : var(--premise-bg-color);
+  */
+  box-shadow: 0 0 30px 10px var(--premise-bg-color) inset;
+  border: var(--premise-border) solid var(--premise-border-color);
+  border-radius: 5px;
+}
+
+#viewer .node .root{
+  stroke: black;
+  stroke-width: 5px;
+}
+
+#viewer div.node.root{
+  border: 4px solid black;
+}
+
+#viewer .node text{
+  text-anchor: middle;
+}
+
+#viewer .node text.self{
+  font-style: normal;
+  font-size : 20px;
+}
+
+#viewer .node text.reference{
+  font-style:italic;
+  font-size : 16px;
+}
+
+#viewer div.node{
+  box-sizing: border-box;
+  padding: 50px;
+  display:flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#viewer div.node div{
+  font-size: 20px;
+}
