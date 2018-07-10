@@ -31,7 +31,7 @@ this.addEventListener("message", function (ev) {
         parameters,
         updateCondition,
         constrain
-      } = __model__ = Model(msg.option)
+      } = __model__ = Model//(msg.option)
 
 
       //console.log(model)
@@ -50,7 +50,7 @@ this.addEventListener("message", function (ev) {
           msg.observed.error
         )
         .setModel(
-          model
+          model(msg.option)
         )
 
 
