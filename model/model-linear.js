@@ -7,8 +7,7 @@
     root.Model = factory();
   }
 }(this, function () {
-  return (option) => {
-    const model = (parameter, data) => {
+    const model = _ => (parameter, data) => {
       var m = {}
       m.x = data.x;
       m.y = data.x.map(v => parameter[0].a * v + parameter[0].b)
@@ -42,4 +41,4 @@
       constrain
     };
   }
-}))
+))
