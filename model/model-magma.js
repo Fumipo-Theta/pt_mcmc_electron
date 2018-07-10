@@ -1,35 +1,19 @@
-/**
- * The model returns chemical profile of Fe/Mg and Cr in a orthopyroxene phenocryst.
- * 
- * Consider crustal processes below:
- * 1. Multiple rapid changes of melt composition
- * 2. Crystal growth of
- *  a. Olivine (Si-Mg-Fe-Cr-Ni)
- *  b. Orthopyroxene (Si-Mg-Fe-Al-Ca-Cr-Ni)
- *  c. Spinel (Cr-Ni)
- *  in the host melt
- * 3. Lattice diffusion of
- *  a. Fe-Mg interdiffusion
- *  b. Cr self diffusion
- *  in orthopyroxene
- */
-
 importScripts(
-  "../../../phase/js/geochem.js",
-  "../../../phase/js/chemical_profile.js",
-  "../../../phase/js/phase.js",
-  "../../../phase/js/liquid.js",
-  "../../../phase/js/solid.js",
-  "../../../jslib/matrix/matrix.js",
-  "../../../phase/js/equilibrate.js",
-  "../../../phase/js/partitioning.js",
-  "../../../phase/js/exchangePartitioning.js",
-  "../../../phase/js/geothermobarometer.js",
-  "../../../phase/js/magma-system.js",
-  "../../../jslib/funcTools.js",
-  "../../../diffusion/js/diffusion.js",
-  "../../../diffusion/js/inter-diffusion.js",
-  "../../../diffusion/js/self-diffusion.js"); // SelfDiffusion*/
+  '../../../phase/js/geochem.js',
+  '../../../phase/js/chemical_profile.js',
+  '../../../phase/js/phase.js',
+  '../../../phase/js/liquid.js',
+  '../../../phase/js/solid.js',
+  '../../../jslib/matrix/matrix.js',
+  '../../../phase/js/equilibrate.js',
+  '../../../phase/js/partitioning.js',
+  '../../../phase/js/exchangePartitioning.js',
+  '../../../phase/js/geothermobarometer.js',
+  '../../../phase/js/magma-system.js',
+  '../../../jslib/funcTools.js',
+  '../../../diffusion/js/diffusion.js',
+  '../../../diffusion/js/inter-diffusion.js',
+  '../../../diffusion/js/self-diffusion.js'); // SelfDiffusion*/
 //console.log(this);
 
 (function (root, factory) {
@@ -61,10 +45,26 @@ importScripts(
   InterDiffusion,
   SelfDiffusion
 ) {
-  return (option) => {
-    const { D0, radius, melt0, Pini } = option;
 
-    const { thermometer, barometer, oxybarometer } = geothermobarometer;
+
+  const { thermometer, barometer, oxybarometer } = geothermobarometer;
+
+  const model = option => {
+    /**
+     * The model returns chemical profile of Fe/Mg and Cr in a orthopyroxene phenocryst.
+     * 
+     * Consider crustal processes below:
+     * 1. Multiple rapid changes of melt composition
+     * 2. Crystal growth of
+     *  a. Olivine (Si-Mg-Fe-Cr-Ni)
+     *  b. Orthopyroxene (Si-Mg-Fe-Al-Ca-Cr-Ni)
+     *  c. Spinel (Cr-Ni)
+     *  in the host melt
+     * 3. Lattice diffusion of
+     *  a. Fe-Mg interdiffusion
+     *  b. Cr self diffusion
+     *  in orthopyroxene
+     */
 
     /** Utility functions
      * 
@@ -90,41 +90,41 @@ importScripts(
      */
     const createPhase = () => {
 
-      const melt = new Liquid("melt").initialize()
+      const melt = new Liquid('melt').initialize()
 
-      const olivine = new Solid("olivine")
+      const olivine = new Solid('olivine')
         .initialize()
         .setKD({
-          "Fe_Mg": KD.olivine.Fe_Mg.Beattie1993()
+          'Fe_Mg': KD.olivine.Fe_Mg.Beattie1993()
         })
         .setD({
-          "Cr2O3": D.olivine.Cr2O3.FreiS2009(),
-          "NiO": D.olivine.NiO.NormanS2005(),
-          "Al2O3": D.olivine.Al2O3.myCompile(melt),
-          "CaO": D.olivine.CaO.myCompile(melt),
-          "TiO2": D.olivine.TiO2.dummy()
+          'Cr2O3': D.olivine.Cr2O3.FreiS2009(),
+          'NiO': D.olivine.NiO.NormanS2005(),
+          'Al2O3': D.olivine.Al2O3.myCompile(melt),
+          'CaO': D.olivine.CaO.myCompile(melt),
+          'TiO2': D.olivine.TiO2.dummy()
         })
-        .setSolver("melt", Equilibrate.olivine_melt(melt, "solve"));
+        .setSolver('melt', Equilibrate.olivine_melt(melt, 'solve'));
 
-      const orthopyroxene = new Solid("orthopyroxene")
+      const orthopyroxene = new Solid('orthopyroxene')
         .initialize()
-        .setKD({ "Fe_Mg": KD.orthopyroxene.Fe_Mg.Beattie1993() })
+        .setKD({ 'Fe_Mg': KD.orthopyroxene.Fe_Mg.Beattie1993() })
         .setD({
-          "Cr2O3": D.orthopyroxene.Cr2O3.FreiS2009(),
-          "NiO": D.orthopyroxene.NiO.NormanS2005(),
-          "Al2O3": D.orthopyroxene.Al2O3.myCompile(melt),
-          "CaO": D.orthopyroxene.CaO.myCompile(melt),
-          "TiO2": D.orthopyroxene.TiO2.dummy()
+          'Cr2O3': D.orthopyroxene.Cr2O3.FreiS2009(),
+          'NiO': D.orthopyroxene.NiO.NormanS2005(),
+          'Al2O3': D.orthopyroxene.Al2O3.myCompile(melt),
+          'CaO': D.orthopyroxene.CaO.myCompile(melt),
+          'TiO2': D.orthopyroxene.TiO2.dummy()
         })
-        .setSolver("melt", Equilibrate.opx_melt(melt, "solve"));
+        .setSolver('melt', Equilibrate.opx_melt(melt, 'solve'));
 
-      const spinel = new Solid("spinel")
+      const spinel = new Solid('spinel')
         .initialize()
         .setD({
-          "Cr2O3": D.spinel.Cr2O3.LieS2008(),
-          "NiO": D.spinel.NiO.LieS2008()
+          'Cr2O3': D.spinel.Cr2O3.LieS2008(),
+          'NiO': D.spinel.NiO.LieS2008()
         })
-        .setSolver("melt", Equilibrate.spinel_melt(melt, "solve"));
+        .setSolver('melt', Equilibrate.spinel_melt(melt, 'solve'));
 
       const meltThermometer = (P) => thermometer.Sugawara2000(melt)(P) - thermometer.liquidusDropMG2008(melt)(P);
 
@@ -142,12 +142,12 @@ importScripts(
      */
     const initialize = (magma, ope) => {
       const { targetPhase, D } = ope;
-      const FeMgDif = new InterDiffusion("FeO", "MgO", getD(D, targetPhase, "Fe_Mg"), "atom")
+      const FeMgDif = new InterDiffusion('FeO', 'MgO', getD(D, targetPhase, 'Fe_Mg'), 'atom')
 
-      const CrDif = new SelfDiffusion("Cr2O3", getD(D, targetPhase, "Cr2O3"))
+      const CrDif = new SelfDiffusion('Cr2O3', getD(D, targetPhase, 'Cr2O3'))
 
-      magma.setDiffusionProfile(FeMgDif, targetPhase, "Fe_Mg");
-      magma.setDiffusionProfile(CrDif, targetPhase, "Cr2O3");
+      magma.setDiffusionProfile(FeMgDif, targetPhase, 'Fe_Mg');
+      magma.setDiffusionProfile(CrDif, targetPhase, 'Cr2O3');
 
       return {}
     }
@@ -173,7 +173,7 @@ importScripts(
      * 
      * moveCrystalBoundary(
      *  magma,
-     *  "orthopyroxene",
+     *  'orthopyroxene',
      *  91.5,
      *  {olivine : 0.5, orthopyroxene : 0.495, spinel : 0.005},
      *  0.001,
@@ -187,11 +187,11 @@ importScripts(
 
       const observedPhase = magma.phase[observedPhaseName];
       let { T, P } = magma.getThermodynamicProperty();
-      observedPhase.equilibrate("melt", T, P)
+      observedPhase.equilibrate('melt', T, P)
 
       const { sign, pathName } = (observedPhase.getMgNumber() < targetMgN)
-        ? { sign: 1., pathName: "ascend" }
-        : { sign: -1., pathName: "descend" };
+        ? { sign: 1., pathName: 'ascend' }
+        : { sign: -1., pathName: 'descend' };
 
       const isExceed = checkExceed(targetMgN, sign);
       const isInRange = checkInRange(-1, 1);
@@ -210,7 +210,7 @@ importScripts(
 
         // equilibrate & record
         solids.map(entry => {
-          entry[1].equilibrate("melt", T, P)
+          entry[1].equilibrate('melt', T, P)
         })
         if (isRecord) {
           solids.map(([name, phase]) => {
@@ -227,7 +227,7 @@ importScripts(
           .compensateFe()
 
         // to check whether exceeding final condition
-        observedPhase.equilibrate("melt", T, P)
+        observedPhase.equilibrate('melt', T, P)
 
         // While exceeding final condition, 
         //  revert melt composition and add/remove 
@@ -250,7 +250,7 @@ importScripts(
 
           // reequilibrate to check whether exceeding final condition
           solids.map(entry => {
-            entry[1].equilibrate("melt", T, P)
+            entry[1].equilibrate('melt', T, P)
           })
 
           limit++
@@ -310,7 +310,7 @@ importScripts(
       */
 
       /* water, pressureはここでハンドル */
-      const water = (ope.hasOwnProperty("water"))
+      const water = (ope.hasOwnProperty('water'))
         ? ope.water
         : initialMelt.composition.H2O;
 
@@ -396,7 +396,7 @@ importScripts(
      * @param {*} Rfin 
      */
     const getProfileWithRadius = (magma, targetPhase, Rini, Rfin) => {
-      const profile = magma.phase[targetPhase].getProfile("descend");
+      const profile = magma.phase[targetPhase].getProfile('descend');
       const l = profile.F.length;
       profile.x = profile.F.map(massToRadiusByConstantDensity(Rini, Rfin, profile.F[l - 1]));
       return profile;
@@ -415,7 +415,7 @@ importScripts(
      * Spatially one dimension diffusion equation is numerycally solved by Crank-Nicolson method. 
      * Neumann condition at the center of crystal, and Dericklet condition at the edge. 
      * 
-     * The scale of time and temperature for diffusivity is treated as unknown parameter, "total scale of diffusion". 
+     * The scale of time and temperature for diffusivity is treated as unknown parameter, 'total scale of diffusion'. 
      * The scale is originally introduced by Lasaga (1983) as compressed time. 
      * Total scale of diffusion represent all possible cooling history which yeild the same value of compressed time. 
      * 
@@ -447,7 +447,7 @@ importScripts(
      *   and elemental diffusion in crystals.
      * The time of repeatation is the same as number of growth satge of the focused crystal. 
     */
-    const magmaProcesses = radius.map((_, i) => {
+    const magmaProcesses = option.radius.map((_, i) => {
       return (i === 0)
         ? []
         : [approximateMagmaMixing, growCrystals, operateDiffusion]
@@ -499,7 +499,6 @@ importScripts(
         integrateDiffusedProfile
       )
 
-    console.log(magma)
 
     /** ================================================
      * The model finally generate chemical profile of orthopyroxene.
@@ -529,34 +528,34 @@ importScripts(
      *  @property {Array} Fe_Mg
      *  @property {Array} Cr2O3
      */
-    const model = (parameters, data) => {
+    return (parameters, data) => {
       magma.setThermodynamicAgent(createPhase())
 
       const modelParameters = parameters.map((p, i) => {
         return [
           {
-            "initialMelt": melt0,
-            "dF": 0.005,
-            "targetPhase": "orthopyroxene",
-            "ini": p.ini,
-            "orthopyroxeneInit": p.orthopyroxeneInit,
-            "spinelInit": p.spinelInit,
-            "Fe2Ratio": melt0.Fe2Ratio,
-            "Pini": Pini[i]
+            'initialMelt': option.melt0,
+            'dF': 0.005,
+            'targetPhase': 'orthopyroxene',
+            'ini': p.ini,
+            'orthopyroxeneInit': p.orthopyroxeneInit,
+            'spinelInit': p.spinelInit,
+            'Fe2Ratio': option.melt0.Fe2Ratio,
+            'Pini': option.Pini[i]
           },
           {
-            "dF": 0.005,
-            "targetPhase": "orthopyroxene",
-            "fin": p.fin,
-            "orthopyroxeneInit": p.orthopyroxeneInit,
-            "spinelInit": p.spinelInit,
+            'dF': 0.005,
+            'targetPhase': 'orthopyroxene',
+            'fin': p.fin,
+            'orthopyroxeneInit': p.orthopyroxeneInit,
+            'spinelInit': p.spinelInit,
           },
           {
-            "targetPhase": "orthopyroxene",
-            "tau": p.log10_tau,
-            "R": radius[i + 1],
-            "Rprev": radius[i],
-            "divNum": (i + 1) * 10
+            'targetPhase': 'orthopyroxene',
+            'tau': p.log10_tau,
+            'R': option.radius[i + 1],
+            'Rprev': option.radius[i],
+            'divNum': (i + 1) * 10
           }
         ]
       }).reduce((a, b) => [...a, ...b], []);
@@ -565,74 +564,75 @@ importScripts(
 
       return magma.execAction([
         {
-          "targetPhase": "orthopyroxene",
-          "D": D0
+          'targetPhase': 'orthopyroxene',
+          'D': option.D0
         },
         ...modelParameters,
         {
-          "targetPhase": "orthopyroxene",
-          "dataPos": data.x
+          'targetPhase': 'orthopyroxene',
+          'dataPos': data.x
         }
       ])
 
     }
-
-    /**
-     * Initial value of parameters are not important.
-     */
-    const parameters = Array(9).fill(0).map((_, i) => {
-      return {
-        "ini": 85,
-        "fin": 80,
-        "orthopyroxeneInit": 0.5,
-        "spinelInit": 0.05,
-        "log10_tau": 6
-      }
-    });
-
-    /**
-     * In the model, initial and final Mg# of the orthopyroxene phenocryst during crystal growth are unknown parameters. 
-     */
-    const updateCondition = {
-      "ini": {
-        "val": 1,
-        "max": 93,
-        "min": 75
-      },
-      "fin": {
-        "val": 1,
-        "max": 93,
-        "min": 75
-      },
-      "orthopyroxeneInit": {
-        "val": 0.05,
-        "max": 1,
-        "min": 0
-      },
-      "spinelInit": {
-        "val": 0.005,
-        "max": 0.1,
-        "min": 0
-      },
-      "log10_tau": {
-        "val": 0.1,
-        "max": 12,
-        "min": 0
-      }
-    }
-
-    const constrain = {
-      ini: (cand, i, parameter) => cand > parameter[i].fin,
-      fin: (cand, i, parameter) => cand < parameter[i].ini,
-      orthopyroxeneInit: (cand, i, parameter) => (0 < cand && cand + parameter[i].spinelInit <= 1),
-      spinelInit: (cand, i, parameter) => cand + parameter[i].orthopyroxeneInit <= 1
-    }
-
-    return {
-      model,
-      parameters,
-      updateCondition,
-      constrain
-    };
   }
-}))
+
+  /**
+   * Initial value of parameters are not important.
+   */
+  const parameters = Array(9).fill(0).map((_, i) => {
+    return {
+      'ini': 85,
+      'fin': 80,
+      'orthopyroxeneInit': 0.5,
+      'spinelInit': 0.05,
+      'log10_tau': 6
+    }
+  });
+
+  /**
+   * In the model, initial and final Mg# of the orthopyroxene phenocryst during crystal growth are unknown parameters. 
+   */
+  const updateCondition = {
+    'ini': {
+      'val': 1,
+      'max': 93,
+      'min': 75
+    },
+    'fin': {
+      'val': 1,
+      'max': 93,
+      'min': 75
+    },
+    'orthopyroxeneInit': {
+      'val': 0.05,
+      'max': 1,
+      'min': 0
+    },
+    'spinelInit': {
+      'val': 0.005,
+      'max': 0.1,
+      'min': 0
+    },
+    'log10_tau': {
+      'val': 0.1,
+      'max': 12,
+      'min': 0
+    }
+  }
+
+  const constrain = {
+    ini: (cand, i, parameter) => cand > parameter[i].fin,
+    fin: (cand, i, parameter) => cand < parameter[i].ini,
+    orthopyroxeneInit: (cand, i, parameter) => (0 < cand && cand + parameter[i].spinelInit <= 1),
+    spinelInit: (cand, i, parameter) => cand + parameter[i].orthopyroxeneInit <= 1
+  }
+
+  return {
+    model,
+    parameters,
+    updateCondition,
+    constrain
+  };
+}
+))
