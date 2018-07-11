@@ -83,7 +83,6 @@
   ptmcmc.setAction("initialize", (self, msg) => {
     console.log(self)
     console.log(msg);
-    state.__model__ = msg.model;
     return msg
   })
     .setAction("sample", (self, msg) => {
@@ -104,7 +103,9 @@
     })
 
 
-  window.addEventListener('DOMContentLoaded', eventHandler(ptmcmc, state), false)
+  //window.addEventListener('DOMContentLoaded', eventHandler(ptmcmc, state), false)
+
+  eventHandler(ptmcmc, state)()
 
   return {
     ptmcmc,

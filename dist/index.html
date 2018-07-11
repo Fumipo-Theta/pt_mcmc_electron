@@ -19,22 +19,16 @@
 
   <script src="../../jslib/MathJax-2.7.2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
   <script type="text/x-mathjax-config">
-        MathJax.Hub.Config({
-          tex2jax: {
-            inlineMath: [ ['$','$'], ["\\(","\\)"] ],
-            displayMath: [ ['$$','$$'], ["\\[","\\]"] ]
-          }
-        });
-    </script>
+      MathJax.Hub.Config({
+        tex2jax: {
+          inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+          displayMath: [ ['$$','$$'], ["\\[","\\]"] ]
+        }
+      });
+  </script>
 </head>
 
 <body id="top">
-  <div id="overlay" style="display:none">
-    <div id="progress.bar">
-      <div class="percent"></div>
-    </div>
-  </div>
-
   <!-- side navigation -->
 
   <div id="page_nav">
@@ -54,6 +48,21 @@
     </div>
   </div>
 
+  <!-- モーダルウィンドウ -->
+  <div id="modal_container">
+    <div id="modal_window" class="render_markdown">
+      <!--div id="button_close_modal_window"></div-->
+
+    </div>
+  </div>
+
+  <div id="overlay" style="display:none">
+    <div id="progress.bar">
+      <div class="percent"></div>
+    </div>
+  </div>
+
+
   <!-- Link of documentation -->
   <div id="link" class="card">
     <div class="inner_card title">
@@ -62,7 +71,8 @@
     <div class="inner_card">
       <ul>
         <li>
-          <a href="./readme.html" target="_blank">Read me</a>
+          <span id="readme" class="show-modal button">Read me
+            <span>
         </li>
       </ul>
     </div>
@@ -80,13 +90,13 @@
           <li>
             <span class="instruction">Output directory</span>
             <span class="input_element">
-              <input id="output_dir_input" type="text" value="" required style="width: 10rem">
+              <input id="output_dir_input" type="text" value="z:/" required style="width: 10rem">
             </span>
           </li>
           <li>
             <span class="instruction">Prefix of output file</span>
             <span class="input_element">
-              <input id="output_prefix_input" type="text" value="" required style="width: 10rem">
+              <input id="output_prefix_input" type="text" value="sample" required style="width: 10rem">
             </span>
           </li>
         </ul>
@@ -101,10 +111,10 @@
           <li>
             <span class="instruction">Model file (.js)</span>
 
-            <input type="text" id="model_file_name_input" value="">
+            <input type="text" id="model_file_name_input" class="input_element" value="" style="width:300px;">
 
+            <span id="show_model" class="show-modal button">show</span>
 
-            <span id="model_file_name" class="fileName"></span>
           </li>
 
           <li>
@@ -116,6 +126,7 @@
                 <input type="file" accept=".json" id="option_file_select" style="display:none">
               </label>
             </span>
+            <!--span id="show_option" class="show-modal button">show</span-->
             <span id="option_file_name" class="fileName">test data</span>
           </li>
 
@@ -127,7 +138,9 @@
                 <input type="file" accept=".csv" id="data_file_select" style="display:none">
               </label>
             </span>
+            <!--span id="show_data" class="show-modal button">show</span-->
             <span id="data_file_name" class="fileName">test data</span>
+
           </li>
 
           <li>
@@ -138,7 +151,9 @@
                 <input type="file" accept=".csv" id="error_file_select" style="display:none">
               </label>
             </span>
+            <!--span id="show_error" class="show-modal button">show</span-->
             <span id="error_file_name" class="fileName">test data</span>
+
           </li>
 
 
@@ -242,25 +257,54 @@
 
   </div>
 
-
-
-
 </body>
 
+<script>
+  if (typeof require !== "undefined") {
+    const remote = require('electron').remote;
+    const dialog = remote.dialog;
+    const browserWindow = remote.BrowserWindow;
 
-<script src="../../jslib/matrix/matrix.js"></script>
-<script src="../../jslib/textFile.js"></script>
-<script src="../../jslib/mt.js"></script>
-<script src="../../jslib/pub_sub.js"></script>
-<script src="../../jslib/palette.js"></script>
-<script src="../src/js/modules/jszip.min.js"></script>
-<script src="../src/js/parallel-tempering.js"></script>
-<script src="../src/js/modules/plotly.min.js"></script>
+    var scripts = [
+      "../src/js/app.js"
+    ]
+  } else {
 
-<script src="../src/js/test-data.js"></script>
-<script src="../src/js/state.js"></script>
-<script src="../src/js/event-handler.js"></script>
-<script src="../src/js/plot-after-event.js"></script>
-<script src="../src/js/app.js"></script>
+    var scripts = [
+      "../../jslib/matrix/matrix.js",
+      "../../jslib/textFile.js",
+      "../../jslib/mt.js",
+      "../../jslib/pub_sub.js",
+      "../../jslib/palette.js",
+      "../src/js/modules/jszip.min.js",
+      "../src/js/parallel-tempering.js",
+      "../src/js/modules/plotly.min.js",
+      "../src/js/test-data.js",
+      "../src/js/state.js",
+      "../src/js/plot-after-event.js",
+      "../node_modules/asciidoctor.js/dist/asciidoctor.min.js",
+      "../node_modules/marked/marked.min.js",
+      "../src/js/modules/modalWindow/media.js",
+      "../src/js/modal-media.js",
+      "../src/js/event-handler.js",
+      "../src/js/app.js"
+    ]
+
+  }
+  var len = scripts.length;
+  var i = 0;
+
+  (function appendScript() {
+    var script = document.createElement('script');
+    script.src = scripts[i];
+    document.body.appendChild(script);
+
+    if (i++ < len - 1) {
+      script.onload = appendScript;
+    }
+  })();
+
+</script>
+
 
 </html>

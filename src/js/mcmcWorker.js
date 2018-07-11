@@ -31,7 +31,7 @@ this.addEventListener("message", function (ev) {
         parameters,
         updateCondition,
         constrain
-      } = __model__ = Model//(msg.option)
+      } = Model//(msg.option)
 
 
       //console.log(model)
@@ -57,8 +57,7 @@ this.addEventListener("message", function (ev) {
       self.postMessage({
         "cmd": "initialize", "msg": {
           "id": observer.id,
-          "parameter": parameters,
-          "model": JSON.stringify(__model__, replacer, 2)
+          "parameter": parameters
         }
       })
       break;

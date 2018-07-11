@@ -11,7 +11,7 @@
       root.ModalMedia
     );
   }
-}(this, function (_PubSub, _tf, _palette, _Modal_Media) {
+}(this, function (_PubSub, _tf, _palette, _ModalMedia) {
 
   const { Publisher, Subscriber } = (typeof require === 'undefined' && (typeof _PubSub === 'object' || typeof _PubSub === 'function'))
     ? _PubSub
@@ -29,6 +29,17 @@
     ? _ModalMedia
     : require("./modal-media");
 
+  const fetchFunc = (url, option) => (typeof require !== 'undefined')
+    ? (fs => {
+      return new Promise((res, rej) => {
+        fs.readFile(url, option)
+          .then(text => res(text))
+      })
+    })(require("fs-extra"))
+    : new Promise((res, rej) => {
+      fetch(url)
+        .then(response => res(response.text()))
+    });
 
   const df2table = df => {
     const thead = Object.keys(df);
@@ -307,7 +318,13 @@
       dom_show.model.addEventListener("click",
         ev => {
           modalWindowPublisher.publish("open");
-          media.show(data2md_code(state.__model__, "Model"))
+          const prefix = (typeof require !== "undefined")
+            ? ""
+            : "../"
+          fetchFunc(prefix + state.model, "utf8")
+            .then(res => {
+              media.show(data2md_code(res, "Model"));
+            });
         },
         false
       )

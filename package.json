@@ -16,6 +16,7 @@
   "dependencies": {
     "asciidoctor.js": "^1.5.7-rc.1",
     "d3": "^5.4.0",
+    "fs-extra": "^6.0.1",
     "fs.promises": "^0.1.2",
     "hyperapp": "^1.2.5",
     "ijavascript-plotly": "0.0.1",
