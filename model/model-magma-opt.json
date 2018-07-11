@@ -1,4 +1,5 @@
 {
+  "targetPhase": "orthopyroxene",
   "D0": {
     "orthopyroxene": {
       "Fe_Mg": {
@@ -11,6 +12,7 @@
       }
     }
   },
+  "dF": 0.001,
   "radius": [
     0e-6,
     30e-6,

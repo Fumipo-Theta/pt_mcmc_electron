@@ -1,3 +1,20 @@
+/**
+ * The model returns chemical profile of Fe/Mg and Cr in a orthopyroxene phenocryst.
+ * 
+ * Consider crustal processes below:
+ * 1. Multiple rapid changes of melt composition
+ * 2. Crystal growth of
+ *  a. Olivine (Si-Mg-Fe-Cr-Ni)
+ *  b. Orthopyroxene (Si-Mg-Fe-Al-Ca-Cr-Ni)
+ *  c. Spinel (Cr-Ni)
+ *  in the host melt
+ * 3. Lattice diffusion of
+ *  a. Fe-Mg interdiffusion
+ *  b. Cr self diffusion
+ *  in orthopyroxene
+ */
+
+
 importScripts(
   '../../../phase/js/geochem.js',
   '../../../phase/js/chemical_profile.js',
@@ -45,26 +62,37 @@ importScripts(
   InterDiffusion,
   SelfDiffusion
 ) {
-
-
-  const { thermometer, barometer, oxybarometer } = geothermobarometer;
-
+  /**
+   * option : {
+   *  targetPhase: String,
+   *  D0 :{
+   *    orthopyroxene : {
+   *      Fe_Mg : {
+   *        d0 : Number,
+   *        E : Numer
+   *      },
+   *      Cr2O3 : {
+   *        d0 : Number,
+   *        E : Number
+   *      }
+   *    }
+   *  },
+   *  dF : Number,
+   *  radius : [Number],
+   *  melt0 : {
+   *    composition : {
+   *      SiO2 : Number,
+   *      ...
+   *      H2O : Number
+   *    },
+   *    Fe2Ratio : Number,
+   *    Pini : [Number]
+   *  }
+   * }
+   */
   return option => {
-    /**
-     * The model returns chemical profile of Fe/Mg and Cr in a orthopyroxene phenocryst.
-     * 
-     * Consider crustal processes below:
-     * 1. Multiple rapid changes of melt composition
-     * 2. Crystal growth of
-     *  a. Olivine (Si-Mg-Fe-Cr-Ni)
-     *  b. Orthopyroxene (Si-Mg-Fe-Al-Ca-Cr-Ni)
-     *  c. Spinel (Cr-Ni)
-     *  in the host melt
-     * 3. Lattice diffusion of
-     *  a. Fe-Mg interdiffusion
-     *  b. Cr self diffusion
-     *  in orthopyroxene
-     */
+
+    const { thermometer, barometer, oxybarometer } = geothermobarometer;
 
     /** Utility functions
      * 
@@ -536,8 +564,8 @@ importScripts(
         return [
           {
             'initialMelt': option.melt0,
-            'dF': 0.005,
-            'targetPhase': 'orthopyroxene',
+            'dF': option.dF,
+            'targetPhase': option.targetPhase,
             'ini': p.ini,
             'orthopyroxeneInit': p.orthopyroxeneInit,
             'spinelInit': p.spinelInit,
@@ -545,14 +573,14 @@ importScripts(
             'Pini': option.Pini[i]
           },
           {
-            'dF': 0.005,
-            'targetPhase': 'orthopyroxene',
+            'dF': option.dF,
+            'targetPhase': option.targetPhase,
             'fin': p.fin,
             'orthopyroxeneInit': p.orthopyroxeneInit,
             'spinelInit': p.spinelInit,
           },
           {
-            'targetPhase': 'orthopyroxene',
+            'targetPhase': option.targetPhase,
             'tau': p.log10_tau,
             'R': option.radius[i + 1],
             'Rprev': option.radius[i],
@@ -565,12 +593,12 @@ importScripts(
 
       return magma.execAction([
         {
-          'targetPhase': 'orthopyroxene',
+          'targetPhase': option.targetPhase,
           'D': option.D0
         },
         ...modelParameters,
         {
-          'targetPhase': 'orthopyroxene',
+          'targetPhase': option.targetPhase,
           'dataPos': data.x
         }
       ])
