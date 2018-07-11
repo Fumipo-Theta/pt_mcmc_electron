@@ -25,6 +25,10 @@
   const dom_acceptedTable = document.querySelector("#accepted_table table");
   const dom_exchangeTable = document.querySelector("#exchange_table table");
 
+  const fs = (typeof require === 'undefined')
+    ? null
+    : require("fs");
+
   const updateTable = (dom_table, tbodyArray, thead = [], tbodyHead = []) => {
     const dom_thead = dom_table.querySelector("thead");
     const dom_tbody = dom_table.querySelector("tbody");
@@ -58,9 +62,10 @@
 
   const updateExchangeRate = (ptmcmc, state, msg) => {
     dom_currentIteration.innerHTML = ptmcmc.totalIteration;
+    state.exchangeTime = ptmcmc.exchangeTime;
     updateTable(
       dom_exchangeTable,
-      [ptmcmc.exchangeTime],
+      [state.exchangeTime],
       Array(state.workerNum - 1).fill(0).map((_, i) => `${i}-${i + 1}`)
     )
   }
@@ -98,7 +103,32 @@
     })
     .setAction("terminate", (self, msg) => {
       console.log("fullfilled")
-      if (typeof require === 'undefined') self.downloadCsv();
+      const meta = ((s) => {
+        const list = [
+          "totalIteration",
+          "workerNum",
+          "alpha",
+          "data_file",
+          "error_file",
+          "model",
+          "acceptedTime",
+          "exchangeTime",
+          "primalyKey",
+          "option_file"
+        ]
+        const filtered = Object.entries(s)
+          .filter(([k, _]) => list.includes(k))
+        const res = {}
+        filtered.map(([k, v]) => {
+          res[k] = v
+        })
+        return res
+      })(state)
+      if (typeof require === 'undefined') {
+        self.downloadCsv(meta);
+      } else {
+        fs.writeFileSync(state.outputDir + "meta-" + [...self.timestamp].pop() + ".json", JSON.stringify(meta, null, 2), "utf8")
+      }
       return msg
     })
 

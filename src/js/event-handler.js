@@ -142,6 +142,7 @@
               break;
           }
           document.querySelector(label).innerHTML = file.name;
+          state[key + "_file"] = file.name;
         }
 
         reader.onerror = err => {

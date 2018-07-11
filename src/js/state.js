@@ -23,12 +23,15 @@
     "alpha": 0.01,
     "data": testData.tanh.data,
     "error": testData.tanh.error,
+    "data_file": "test",
+    "error_file": "test",
     "model": "model/model-tanh.js",
     "acceptedTime": [],
-    "exchangedTime": [],
+    "exchangeTime": [],
     "primalyKey": "x",
     "colorMap": [],
-    "option": {}
+    "option": {},
+    "option_file": ""
   }
 
   return state;

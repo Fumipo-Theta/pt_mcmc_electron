@@ -525,7 +525,7 @@
       return arr.reduce((a, b) => a + "," + b) + "\n";
     }
 
-    downloadCsv() {
+    downloadCsv(state) {
       const zip = new JSZip();
       const ts = [...this.timestamp].pop()
       const folder = zip.folder(ts);
@@ -534,6 +534,7 @@
         .map(([k, v]) => {
           folder.file(k, v.reduce((a, b) => a + b))
         })
+      folder.file("meta.json", JSON.stringify(state, null, 2))
       folder.generateAsync({ type: "base64" })
         .then(function (base64) {
           location.href = "data:application/zip;base64," + base64;
