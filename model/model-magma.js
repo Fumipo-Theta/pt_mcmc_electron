@@ -49,7 +49,7 @@ importScripts(
 
   const { thermometer, barometer, oxybarometer } = geothermobarometer;
 
-  const model = option => {
+  return option => {
     /**
      * The model returns chemical profile of Fe/Mg and Cr in a orthopyroxene phenocryst.
      * 
@@ -142,6 +142,9 @@ importScripts(
      */
     const initialize = (magma, ope) => {
       const { targetPhase, D } = ope;
+
+      magma.setThermodynamicAgent(createPhase());
+
       const FeMgDif = new InterDiffusion('FeO', 'MgO', getD(D, targetPhase, 'Fe_Mg'), 'atom')
 
       const CrDif = new SelfDiffusion('Cr2O3', getD(D, targetPhase, 'Cr2O3'))
@@ -528,9 +531,7 @@ importScripts(
      *  @property {Array} Fe_Mg
      *  @property {Array} Cr2O3
      */
-    return (parameters, data) => {
-      magma.setThermodynamicAgent(createPhase())
-
+    const model = (parameters, data) => {
       const modelParameters = parameters.map((p, i) => {
         return [
           {
@@ -575,64 +576,65 @@ importScripts(
       ])
 
     }
-  }
 
-  /**
-   * Initial value of parameters are not important.
-   */
-  const parameters = Array(9).fill(0).map((_, i) => {
+
+    /**
+     * Initial value of parameters are not important.
+     */
+    const parameters = Array(9).fill(0).map((_, i) => {
+      return {
+        'ini': 85,
+        'fin': 80,
+        'orthopyroxeneInit': 0.5,
+        'spinelInit': 0.05,
+        'log10_tau': 6
+      }
+    });
+
+    /**
+     * In the model, initial and final Mg# of the orthopyroxene phenocryst during crystal growth are unknown parameters. 
+     */
+    const updateCondition = {
+      'ini': {
+        'val': 1,
+        'max': 93,
+        'min': 75
+      },
+      'fin': {
+        'val': 1,
+        'max': 93,
+        'min': 75
+      },
+      'orthopyroxeneInit': {
+        'val': 0.05,
+        'max': 1,
+        'min': 0
+      },
+      'spinelInit': {
+        'val': 0.005,
+        'max': 0.1,
+        'min': 0
+      },
+      'log10_tau': {
+        'val': 0.1,
+        'max': 12,
+        'min': 0
+      }
+    }
+
+    const constrain = {
+      ini: (cand, i, parameter) => cand > parameter[i].fin,
+      fin: (cand, i, parameter) => cand < parameter[i].ini,
+      orthopyroxeneInit: (cand, i, parameter) => (0 < cand && cand + parameter[i].spinelInit <= 1),
+      spinelInit: (cand, i, parameter) => cand + parameter[i].orthopyroxeneInit <= 1
+    }
+
     return {
-      'ini': 85,
-      'fin': 80,
-      'orthopyroxeneInit': 0.5,
-      'spinelInit': 0.05,
-      'log10_tau': 6
-    }
-  });
-
-  /**
-   * In the model, initial and final Mg# of the orthopyroxene phenocryst during crystal growth are unknown parameters. 
-   */
-  const updateCondition = {
-    'ini': {
-      'val': 1,
-      'max': 93,
-      'min': 75
-    },
-    'fin': {
-      'val': 1,
-      'max': 93,
-      'min': 75
-    },
-    'orthopyroxeneInit': {
-      'val': 0.05,
-      'max': 1,
-      'min': 0
-    },
-    'spinelInit': {
-      'val': 0.005,
-      'max': 0.1,
-      'min': 0
-    },
-    'log10_tau': {
-      'val': 0.1,
-      'max': 12,
-      'min': 0
-    }
+      model,
+      parameters,
+      updateCondition,
+      constrain
+    };
   }
-
-  const constrain = {
-    ini: (cand, i, parameter) => cand > parameter[i].fin,
-    fin: (cand, i, parameter) => cand < parameter[i].ini,
-    orthopyroxeneInit: (cand, i, parameter) => (0 < cand && cand + parameter[i].spinelInit <= 1),
-    spinelInit: (cand, i, parameter) => cand + parameter[i].orthopyroxeneInit <= 1
-  }
-
-  return {
-    model,
-    parameters,
-    updateCondition,
-    constrain
-  };
 }
 ))
