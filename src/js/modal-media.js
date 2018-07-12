@@ -18,7 +18,6 @@
     );
   }
 }(this, function (_Media, _PubSub/*, MathJax, hljs*/) {
-
   const Media = (typeof require === 'undefined' && (typeof _Media === 'object' || typeof _Media === 'function'))
     ? _Media
     : require("./modules/modalWindow/media");

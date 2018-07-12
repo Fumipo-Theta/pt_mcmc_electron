@@ -14,18 +14,7 @@
   <link rel="stylesheet" href="../src/js/modules/modalWindow/modal_window.css">
   <link rel="stylesheet" href="../src/js/modules/modalWindow/font-awesome-4.5.0/css/font-awesome.min.css">
   <link rel="stylesheet" href="../src/js/modules/highlight/styles/tomorrow-night-bright.css">
-  <script src="../src/js/modules/highlight/highlight.pack.js"></script>
-  <script>hljs.initHighlightingOnLoad();</script>
-
-  <script src="../../jslib/MathJax-2.7.2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-  <script type="text/x-mathjax-config">
-      MathJax.Hub.Config({
-        tex2jax: {
-          inlineMath: [ ['$','$'], ["\\(","\\)"] ],
-          displayMath: [ ['$$','$$'], ["\\[","\\]"] ]
-        }
-      });
-  </script>
+  <script src="../../jslib/loadScript.js"></script>
 </head>
 
 <body id="top">
@@ -264,13 +253,10 @@
     const remote = require('electron').remote;
     const dialog = remote.dialog;
     const browserWindow = remote.BrowserWindow;
-
-    var scripts = [
-      "../src/js/app.js"
-    ]
+    var webScripts = [];
   } else {
 
-    var scripts = [
+    var webScripts = [
       "../../jslib/matrix/matrix.js",
       "../../jslib/textFile.js",
       "../../jslib/mt.js",
@@ -286,25 +272,30 @@
       "../node_modules/marked/marked.min.js",
       "../src/js/modules/modalWindow/media.js",
       "../src/js/modal-media.js",
-      "../src/js/event-handler.js",
-      "../src/js/app.js"
+      "../src/js/event-handler.js"
     ]
 
   }
-  var len = scripts.length;
-  var i = 0;
 
-  (function appendScript() {
-    var script = document.createElement('script');
-    script.src = scripts[i];
-    document.body.appendChild(script);
+  const scripts = [
+    "../../jslib/MathJax-2.7.2/MathJax.js?config=TeX-AMS-MML_HTMLorMML",
+    "../src/js/modules/highlight/highlight.pack.js",
+    ...webScripts,
+    "../src/js/app.js"
+  ]
 
-    if (i++ < len - 1) {
-      script.onload = appendScript;
+
+
+  scripts.map(src => loadScript({ src }));
+
+  loadScript({ innerHTML: `hljs.initHighlightingOnLoad()`, type: "module" })
+  loadScript({
+    innerHTML: `MathJax.Hub.Config({
+        tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      displayMath: [ ['$$','$$'], ["\\[","\\]"] ]
     }
-  })();
-
+  });`}, { type: "module text/x-mathjax-config" })
 </script>
-
 
 </html>
