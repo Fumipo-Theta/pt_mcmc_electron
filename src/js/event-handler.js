@@ -162,7 +162,7 @@
         // コントローラーを定義したほうが良さそう
         if (state.isDirty) {
           ptmcmc
-            .createChain(
+            .startSession(
               state.workerNum,
               {
                 "observed": {
@@ -182,7 +182,7 @@
         state.totalIteration += parseInt(state.iteration);
         dom_totalIteration.innerHTML = state.totalIteration;
 
-        ptmcmc.execute(
+        ptmcmc.startSampling(
           state.iteration,
           state.outputDir + state.outputPrefix
         )

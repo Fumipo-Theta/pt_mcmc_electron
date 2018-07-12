@@ -126,7 +126,7 @@
      * @param {Object} opt
      * @param {String} workerPath
      */
-    createChain(n, opt, workerPath = "../src/js/mcmcWorker.js") {
+    startSession(n, opt, workerPath = "../src/js/mcmcWorker.js") {
       const self = this;
       this.restJobTime = 0;
       this.totalIteration = 0;
@@ -179,7 +179,7 @@
     }
 
     /**
-     * ptmcmc.execute(100, "z:/sample")
+     * ptmcmc.startSampling(100, "z:/sample")
      * 
      * this method create output file whose path are:
      * z:/sample-0-${timestamp}.csv
@@ -191,7 +191,7 @@
      * @param {Integer} iteration 
      * @param {String} outputPrefix 
      */
-    execute(iteration, outputPrefix) {
+    startSampling(iteration, outputPrefix) {
       const self = this;
       this.iteration = 0;
       this.outputPrefix = outputPrefix;

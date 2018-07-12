@@ -92,29 +92,6 @@ th{
 	font-family: "Arial";
 }
 
-/* Covering whole window */
-#modal_container.active{
-	background-color: rgba(255,255,255,0.5);
-	position: sticky;
-	left:0;
-	top:0;
-	width: 100vw;
-	height: 100vh;
-	display:flex;
-	align-items: center;
-	justify-content: center;
-	animation: show 0.5s linear 0s;
-}
-
-#modal_container{
-  display:none;
-}
-
-#modal_window{
-  box-shadow: var(--box-shadow-dense);
-  overflow: auto;
-}
-
 
 /* page navigation */
 @media screen and (max-width:1079px) {
