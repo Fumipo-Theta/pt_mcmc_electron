@@ -1,3 +1,6 @@
+/**
+ * The model of hyperbolic tangent: $f(x) = a \tanh \frac{x}{b} + c$
+ */
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
     define([], factory);
