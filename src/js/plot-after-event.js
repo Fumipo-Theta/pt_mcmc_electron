@@ -182,9 +182,9 @@
       ptmcmc.parameterStorage[0]
     )
 
-    const plotMethod = (ptmcmc.totalIteration === 1)
+    const plotMethod = (ptmcmc.totalIteration === 1 || ptmcmc.totalIteration === state.totalIteration)
       ? Plotly.newPlot
-      : (ptmcmc.totalIteration % 10 === 0)
+      : (ptmcmc.totalIteration % state.plotInterval === 0)
         ? Plotly.react
         : (_) => null;
 
@@ -283,9 +283,9 @@
       state.colorMap
     )
 
-    const plotMethod = (ptmcmc.totalIteration === 1)
+    const plotMethod = (ptmcmc.totalIteration === 1 || ptmcmc.totalIteration === state.totalIteration)
       ? Plotly.newPlot
-      : (ptmcmc.totalIteration % 10 === 0)
+      : (ptmcmc.totalIteration % state.plotInterval === 0)
         ? Plotly.react
         : (_) => null;
 

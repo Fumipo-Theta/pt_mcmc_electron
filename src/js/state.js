@@ -31,7 +31,8 @@
     "primalyKey": "x",
     "colorMap": [],
     "option": {},
-    "option_file": ""
+    "option_file": "",
+    "plotInterval": 1
   }
 
   return state;
