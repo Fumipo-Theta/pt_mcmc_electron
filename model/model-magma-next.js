@@ -245,7 +245,11 @@ importScripts(
 
       // repeat until Mg# of targetPhase exceeds targetMgN or F becomes out of range [0,1]
       let limit = 0
-      while (isInRange(F) && !isExceed(observedPhase.getMgNumber())) {
+      melt.startDifferentiate();
+      while (isInRange(F)
+        && !isExceed(observedPhase.getMgNumber())
+        && !melt.outOfRange
+      ) {
         let { T, P } = magma.getThermodynamicProperty();
 
         // equilibrate & record

@@ -36,6 +36,7 @@
         : seed
       )
       this.eps = 1e-6;
+      this.outRangeFlag = false;
       return this;
     }
 
@@ -201,12 +202,14 @@
       let cand = this.parameters[i][k] +
         this.updateStep[k].val * this.rand._getU(-1, 1) * (1 + this.amplitude);
 
+      this.outRangeFlag = !(this.isInRange(cand, k)
+        && this.satisfyConstraint(cand, i, k));
+
       this.candidateParameters[i][k] = (
-        this.isInRange(cand, k)
-        && this.satisfyConstraint(cand, i, k)
+        this.outRangeFlag
       )
-        ? cand
-        : this.parameters[i][k]
+        ? this.parameters[i][k]
+        : cand
       return this;
     }
 
@@ -215,6 +218,10 @@
      * @param {Bool} byLineElement 
      */
     getLikelihood(byLineElement = false) {
+
+      // When candidate is out of range, ignore.
+      if (this.outRangeFlag) return this;
+
       const modeled = this.modelFunc(this.candidateParameters, this.data);
       this.model = modeled;
       //console.log(modeled);
@@ -238,7 +245,8 @@
     transaction(k, i = 0) {
       const lnRatio = this.invT * (this.lnPcand - this.lnP);
 
-      if (lnRatio > Math.log(this.rand.next())) {
+      // When candidate is out of range, ignore.
+      if (!this.outRangeFlag && lnRatio > Math.log(this.rand.next())) {
         // Update
         this.parameters[i][k] = this.candidateParameters[i][k];
         this.acceptedTime[i][k]++;
@@ -249,6 +257,7 @@
 
       }
       this.sampledTime[i][k]++;
+
       return this;
     }
 
