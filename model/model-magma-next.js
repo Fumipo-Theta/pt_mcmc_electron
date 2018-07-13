@@ -49,7 +49,8 @@ if (typeof require === "undefined") {
       root.exchangePartitioning,
       root.MagmaSystem,
       root.InterDiffusion,
-      root.SelfDiffusion
+      root.SelfDiffusion,
+      root.Diffusion
     );
   }
 }(this, function (
@@ -61,7 +62,8 @@ if (typeof require === "undefined") {
   _KD,
   _MagmaSystem,
   _InterDiffusion,
-  _SelfDiffusion
+  _SelfDiffusion,
+  _Diffusion
 ) {
   const Liquid = (typeof require === 'undefined' && (typeof _Liquid === 'object' || typeof _Liquid === 'function'))
     ? _Liquid
@@ -99,6 +101,10 @@ if (typeof require === "undefined") {
   const SelfDiffusion = (typeof require === 'undefined' && (typeof _SelfDiffusion === 'object' || typeof _SelfDiffusion === 'function'))
     ? _SelfDiffusion
     : require('../../diffusion/js/self-diffusion');
+
+  const Diffusion = (typeof require === 'undefined' && (typeof _Diffusion === 'object' || typeof _Diffusion === 'function'))
+    ? _Diffusion
+    : require('../../diffusion/js/diffusion');
 
 
 
@@ -228,6 +234,8 @@ if (typeof require === "undefined") {
       magma.setDiffusionProfile(FeMgDif, targetPhase, 'Fe_Mg');
       magma.setDiffusionProfile(CrDif, targetPhase, 'Cr2O3');
       magma.custom.profileStack = [];
+      magma.custom.mixingLineStack = [];
+      magma.custom.differentiationLineStack = [];
 
       return {}
     }
@@ -282,6 +290,8 @@ if (typeof require === "undefined") {
       solids.map(([_, phase]) => {
         phase.resetProfile(pathName);
       })
+
+      melt.resetProfile(pathName);
 
       // repeat until Mg# of targetPhase exceeds targetMgN or F becomes out of range [0,1]
       let limit = 0
@@ -356,6 +366,7 @@ if (typeof require === "undefined") {
         })
         melt.pushProfile(1 + F * sign, T, P, pathName);
       }
+      return pathName;
 
     }
 
@@ -387,13 +398,17 @@ if (typeof require === "undefined") {
         barometer: _ => P
       })
 
-      recordLocalEquilibriumCondition(
+      const pathName = recordLocalEquilibriumCondition(
         magma,
         targetPhase,
         MgN_beforeMixing,
         stoichiometry,
         dF,
-        false
+        true
+      )
+
+      magma.custom.mixingLineStack.push(
+        magma.phase.melt.profile[pathName].get()
       )
 
       return {}
@@ -429,7 +444,7 @@ if (typeof require === "undefined") {
       })
 
       // 結晶成長を伴うメルト組成変化
-      recordLocalEquilibriumCondition(
+      const pathName = recordLocalEquilibriumCondition(
         magma,
         targetPhase,
         MgN_beforeCrystallization,
@@ -441,7 +456,11 @@ if (typeof require === "undefined") {
         * 注目する相のプロファイルをスタックに追加
         */
       magma.custom.profileStack.push(
-        magma.phase[targetPhase].profile.ascend.get()
+        magma.phase[targetPhase].profile[pathName].get()
+      )
+
+      magma.custom.differentiationLineStack.push(
+        magma.phase.melt.profile[pathName].get()
       )
       return {}
     }
@@ -808,7 +827,8 @@ if (typeof require === "undefined") {
       model,
       parameters,
       updateCondition,
-      constrain
+      constrain,
+      magma
     };
   }
 }
