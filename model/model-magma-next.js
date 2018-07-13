@@ -14,24 +14,25 @@
  *  in orthopyroxene
  */
 
-
-importScripts(
-  '../../../phase/js/geochem.js',
-  '../../../phase/js/chemical_profile.js',
-  '../../../phase/js/phase.js',
-  '../../../phase/js/liquid.js',
-  '../../../phase/js/solid.js',
-  '../../../jslib/matrix/matrix.js',
-  '../../../phase/js/equilibrate.js',
-  '../../../phase/js/partitioning.js',
-  '../../../phase/js/exchangePartitioning.js',
-  '../../../phase/js/geothermobarometer.js',
-  '../../../phase/js/magma-system.js',
-  '../../../jslib/funcTools.js',
-  '../../../diffusion/js/diffusion.js',
-  '../../../diffusion/js/inter-diffusion.js',
-  '../../../diffusion/js/self-diffusion.js'); // SelfDiffusion*/
-//console.log(this);
+if (typeof require === "undefined") {
+  importScripts(
+    '../../../phase/js/geochem.js',
+    '../../../phase/js/chemical_profile.js',
+    '../../../phase/js/phase.js',
+    '../../../phase/js/liquid.js',
+    '../../../phase/js/solid.js',
+    '../../../jslib/matrix/matrix.js',
+    '../../../phase/js/equilibrate.js',
+    '../../../phase/js/partitioning.js',
+    '../../../phase/js/exchangePartitioning.js',
+    '../../../phase/js/geothermobarometer.js',
+    '../../../phase/js/magma-system.js',
+    '../../../jslib/funcTools.js',
+    '../../../diffusion/js/diffusion.js',
+    '../../../diffusion/js/inter-diffusion.js',
+    '../../../diffusion/js/self-diffusion.js'); // SelfDiffusion*/
+  //console.log(this);
+}
 
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
@@ -52,16 +53,55 @@ importScripts(
     );
   }
 }(this, function (
-  Liquid,
-  Solid,
-  geothermobarometer,
-  Equilibrate,
-  D,
-  KD,
-  MagmaSystem,
-  InterDiffusion,
-  SelfDiffusion
+  _Liquid,
+  _Solid,
+  _geothermobarometer,
+  _Equilibrate,
+  _D,
+  _KD,
+  _MagmaSystem,
+  _InterDiffusion,
+  _SelfDiffusion
 ) {
+  const Liquid = (typeof require === 'undefined' && (typeof _Liquid === 'object' || typeof _Liquid === 'function'))
+    ? _Liquid
+    : require('../../phase/js/liquid');
+
+  const Solid = (typeof require === 'undefined' && (typeof _Solid === 'object' || typeof _Solid === 'function'))
+    ? _Solid
+    : require('../../phase/js/solid');
+
+  const geothermobarometer = (typeof require === 'undefined' && (typeof _geothermobarometer === 'object' || typeof _geothermobarometer === 'function'))
+    ? _geothermobarometer
+    : require('../../phase/js/geothermobarometer');
+
+
+  const Equilibrate = (typeof require === 'undefined' && (typeof _Equilibrate === 'object' || typeof _Equilibrate === 'function'))
+    ? _Equilibrate
+    : require('../../phase/js/equilibrate');
+
+  const D = (typeof require === 'undefined' && (typeof _D === 'object' || typeof _D === 'function'))
+    ? _D
+    : require('../../phase/js/partitioning');
+
+  const KD = (typeof require === 'undefined' && (typeof _KD === 'object' || typeof _KD === 'function'))
+    ? _KD
+    : require('../../phase/js/exchangePartitioning');
+
+  const MagmaSystem = (typeof require === 'undefined' && (typeof _MagmaSystem === 'object' || typeof _MagmaSystem === 'function'))
+    ? _MagmaSystem
+    : require('../../phase/js/magma-system');
+
+  const InterDiffusion = (typeof require === 'undefined' && (typeof _InterDiffusion === 'object' || typeof _InterDiffusion === 'function'))
+    ? _InterDiffusion
+    : require('../../diffusion/js/inter-diffusion');
+
+  const SelfDiffusion = (typeof require === 'undefined' && (typeof _SelfDiffusion === 'object' || typeof _SelfDiffusion === 'function'))
+    ? _SelfDiffusion
+    : require('../../diffusion/js/self-diffusion');
+
+
+
   /**
    * option : {
    *  targetPhase: String,
