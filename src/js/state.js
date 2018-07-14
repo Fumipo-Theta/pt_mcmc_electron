@@ -28,7 +28,7 @@
     "model": "model/model-tanh.js",
     "acceptedTime": [],
     "exchangeTime": [],
-    "primalyKey": "x",
+    "primaryKey": "x",
     "colorMap": [],
     "option": {},
     "option_file": "",

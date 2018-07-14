@@ -769,7 +769,7 @@ if (typeof require === "undefined") {
      */
     const updateCondition = {
       'MgN_beforeCrystallization': {
-        'val': 1,
+        'val': 0.5,
         'max': 93,
         'min': 75
       },
@@ -784,7 +784,7 @@ if (typeof require === "undefined") {
         'min': 0
       },
       'MgN_beforeMixing': {
-        'val': 1,
+        'val': 0.5,
         'max': 93,
         'min': 75
       },

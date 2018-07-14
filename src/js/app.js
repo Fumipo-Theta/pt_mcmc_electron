@@ -34,7 +34,7 @@
     const dom_tbody = dom_table.querySelector("tbody");
 
     if (thead.length > 0) {
-      dom_thead.innerHTML = `<thead><th></th>${thead.map(v => `<th>${v}</th>`).reduce((a, b) => a + b, "")}</thead>`
+      dom_thead.innerHTML = `<thead><th></th>${thead.map(v => `<th>${v.replace(/_/g, " ")}</th>`).reduce((a, b) => a + b, "")}</thead>`
     }
 
     dom_tbody.innerHTML = `<tbody>
@@ -113,8 +113,9 @@
           "model",
           "acceptedTime",
           "exchangeTime",
-          "primalyKey",
-          "option_file"
+          "primaryKey",
+          "option_file",
+          "option"
         ]
         const filtered = Object.entries(s)
           .filter(([k, _]) => list.includes(k))

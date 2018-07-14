@@ -54,7 +54,7 @@
     }
 
     return "<table class='tableblock'>"
-      + `<thead>${thead.map(v => `<th>${v}</th>`).reduce((a, b) => a + b, "")}</thead>`
+      + `<thead>${thead.map(v => `<th>${v.replace(/_/g, " ")}</th>`).reduce((a, b) => a + b, "")}</thead>`
       + `<tbody>
     ${tbody.map((rowAsArray, i) => {
         return `<tr>
