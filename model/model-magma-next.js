@@ -767,43 +767,45 @@ if (typeof require === "undefined") {
     /**
      * In the model, initial and final Mg# of the orthopyroxene phenocryst during crystal growth are unknown parameters. 
      */
-    const updateCondition = {
-      'MgN_beforeCrystallization': {
-        'val': 0.5,
-        'max': 93,
-        'min': 75
-      },
-      'growth_stoichiometry_orthopyroxene': {
-        'val': 0.05,
-        'max': 1,
-        'min': 0
-      },
-      'growth_stoichiometry_spinel': {
-        'val': 0.005,
-        'max': 0.1,
-        'min': 0
-      },
-      'MgN_beforeMixing': {
-        'val': 0.5,
-        'max': 93,
-        'min': 75
-      },
-      'mixing_stoichiometry_orthopyroxene': {
-        'val': 0.05,
-        'max': 1,
-        'min': 0
-      },
-      'mixing_stoichiometry_spinel': {
-        'val': 0.005,
-        'max': 0.1,
-        'min': 0
-      },
-      'log10_tau': {
-        'val': 0.1,
-        'max': 12,
-        'min': 0
+    const updateCondition = (option.hasOwnProperty("updateCondition"))
+      ? option.updateCondition
+      : {
+        'MgN_beforeCrystallization': {
+          'val': 0.5,
+          'max': 93,
+          'min': 75
+        },
+        'growth_stoichiometry_orthopyroxene': {
+          'val': 0.05,
+          'max': 1,
+          'min': 0
+        },
+        'growth_stoichiometry_spinel': {
+          'val': 0.005,
+          'max': 0.1,
+          'min': 0
+        },
+        'MgN_beforeMixing': {
+          'val': 0.5,
+          'max': 93,
+          'min': 75
+        },
+        'mixing_stoichiometry_orthopyroxene': {
+          'val': 0.05,
+          'max': 1,
+          'min': 0
+        },
+        'mixing_stoichiometry_spinel': {
+          'val': 0.005,
+          'max': 0.1,
+          'min': 0
+        },
+        'log10_tau': {
+          'val': 0.1,
+          'max': 12,
+          'min': 0
+        }
       }
-    }
 
     /**
      * 結晶化前のMg#は結晶化後のMg#, すなわちマグマ混合前のMg#より大きい.
