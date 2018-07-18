@@ -222,12 +222,12 @@
       // When candidate is out of range, ignore.
       if (this.outRangeFlag) return this;
 
-      const modeled = this.modelFunc(this.candidateParameters, this.data);
-      this.model = modeled;
+      this.model = this.modelFunc(this.candidateParameters, this.data);
+
       //console.log(modeled);
       const lnP = (byLineElement)
-        ? this.getAllLnProbabilityByPoint(modeled)
-        : this.getAllLnProbabilityByCurve(modeled)
+        ? this.getAllLnProbabilityByCurve(this.model)
+        : this.getAllLnProbabilityByPoint(this.model)
 
       this.lnPcand = (isFinite(lnP))
         ? lnP

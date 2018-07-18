@@ -1,6 +1,6 @@
 = Analysis for multiple crystallization and diffusion by PT-MCMC
 :toc: left
-:toclevels: 4
+:toclevels: 3
 :icons: font
 :stem: latexmath
 :source-highlighter: coderay
@@ -21,20 +21,23 @@ These structure enables user to concentrate on constructing model.
 === Creating model
 
 You can write model and parameters settings as single javascript module. 
-The module must export 4 functions and objects:
+The module can recieve external parameters and must export 4 functions and objects:
 
 model:: Function returning the modeled data
-parameters:: Array composed of objects defining the initial parameters 
-updateCondition:: Objects defining the condition for updating parameters
-constrain:: Objects defining function of constraining parameters
+parameters:: Array composed of objects defining the set of initial parameters 
+updateCondition:: Objects defining the conditions for updating parameters
+constrain:: Objects defining functions of constraining parameters
 
 [source,javascript]
 ----
-module.exports = {
-  model,
-  parameters,
-  updateConditions,
-  constrain
+module.exports = function(external_option){ 
+  // Define components, and finally
+  return {
+    model,
+    parameters,
+    updateConditions,
+    constrain
+  }
 }
 ----
 
