@@ -225,7 +225,7 @@
       const modeled = this.modelFunc(this.candidateParameters, this.data);
       this.model = modeled;
       //console.log(modeled);
-      const lnP = (!byLineElement)
+      const lnP = (byLineElement)
         ? this.getAllLnProbabilityByPoint(modeled)
         : this.getAllLnProbabilityByCurve(modeled)
 
