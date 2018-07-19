@@ -51,7 +51,7 @@
     1,
     1
   ],
-  "MgN_atRim": 80.71,
+  "MgN_atRim": 86.,
   "updateCondition": {
     "MgN_beforeCrystallization": {
       "val": 0.5,
@@ -84,7 +84,7 @@
       "min": 0
     },
     "log10_tau": {
-      "val": 0.1,
+      "val": 2,
       "max": 12,
       "min": 0
     }
