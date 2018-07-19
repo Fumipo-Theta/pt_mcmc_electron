@@ -10,7 +10,7 @@
     // like Node.
     module.exports = factory();
   } else {
-    // Browser globals (root is window)
+    // Browser global (root is window)
     root.MCMC = factory(
       root.MersenneTwister
     );

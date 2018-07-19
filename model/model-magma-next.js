@@ -115,7 +115,7 @@ if (typeof require === "undefined") {
    *    orthopyroxene : {
    *      Fe_Mg : {
    *        d0 : Number,
-   *        E : Numer
+   *        E : Number
    *      },
    *      Cr2O3 : {
    *        d0 : Number,
@@ -246,7 +246,7 @@ if (typeof require === "undefined") {
      *   during a reaction of melting or crystallization. 
      * It starts from a condition where the host melt has a specific composition. 
      * In each calculation step of, we calculate composition of solid phases 
-     *   by using partitioning coefficient assuming achivement of local equilibrium with host melt.
+     *   by using partitioning coefficient assuming achievement of local equilibrium with host melt.
      * Then, when crystal growth is considered, small fraction of solid phases are removed from the host melt. 
      * On the other hand, when assimilation of crystal is considered, they are added to the host melt. 
      * In the calculation, we use Mg# of some phase as an extent of progression of the reaction.
@@ -342,7 +342,7 @@ if (typeof require === "undefined") {
             dF * sign
           ).compensateFe()
 
-          // reequilibrate to check whether exceeding final condition
+          // re-equilibrate to check whether exceeding final condition
           solids.map(entry => {
             entry[1].equilibrate('melt', T, P)
           })
@@ -352,7 +352,7 @@ if (typeof require === "undefined") {
         }
         //=========================
 
-        // Update total fraction not exxceeding final condition
+        // Update total fraction not exceeding final condition
         F += dF;
 
         if (isSame(observedPhase.getMgNumber())) break;
@@ -506,19 +506,19 @@ if (typeof require === "undefined") {
     /**
      * Simulate elemental diffusion in the focused crystal. 
      * The crystal is spherical symmetry. 
-     * Diffusion coefficients depends only on temperature as Arhenius relation. 
+     * Diffusion coefficients depends only on temperature as Arrhenius relation. 
      * 
      * In the model, inter diffusivity of Fe and Mg components and self diffusivity of Cr2O3 are 
      *  considered. 
      * During diffusion, the host melt composition is constant and local equilibrium at crystal surface
      *  always established. 
      * 
-     * Spatially one dimension diffusion equation is numerycally solved by Crank-Nicolson method. 
+     * Spatially one dimension diffusion equation is numerically solved by Crank-Nicolson method. 
      * Neumann condition at the center of crystal, and Dericklet condition at the edge. 
      * 
      * The scale of time and temperature for diffusivity is treated as unknown parameter, 'total scale of diffusion'. 
      * The scale is originally introduced by Lasaga (1983) as compressed time. 
-     * Total scale of diffusion represent all possible cooling history which yeild the same value of compressed time. 
+     * Total scale of diffusion represent all possible cooling history which yields the same value of compressed time. 
      * 
      * @param {MagmaSystem} magma 
      * @param {*} ope 
@@ -548,9 +548,9 @@ if (typeof require === "undefined") {
     }
 
     /** 
-     * Assumed crustal processes are repeatation of magma mixing, crystal growth, 
+     * Assumed crustal processes are reputation of magma mixing, crystal growth, 
      *   and elemental diffusion in crystals.
-     * The time of repeatation is the same as number of growth satge of the focused crystal. 
+     * The time of reputation is the same as number of growth stage of the focused crystal. 
      * 
      * eruptedMelt =>
      * ascend(push profile) -> beforeMixing ->
@@ -629,7 +629,7 @@ if (typeof require === "undefined") {
      * The crystals are spherical symmetry. 
      * The crystal experiences multiple stages of crystal growth and lattice diffusion.
      * The lattice diffusion progresses after crystal growth terminated in each stage.
-     * The chemical composition of grown crystal determined by host melt compositon and partitioning coefficients. 
+     * The chemical composition of grown crystal determined by host melt composition and partitioning coefficients. 
      * 
      * 
      * @param {Array} parameters
