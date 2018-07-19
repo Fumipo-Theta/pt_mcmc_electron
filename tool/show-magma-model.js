@@ -35,7 +35,9 @@
 
     const data = tf.text2Dataframe(fs.readFileSync(`${dp}${meta.data_file}`, "utf-8"), "csv")
     const error = tf.text2Dataframe(fs.readFileSync(`${dp}${meta.data_file}`, "utf-8"), "csv")
-    const option = JSON.parse(fs.readFileSync("../model/" + meta.option_file, "utf-8"))
+    const option = (meta.hasOwnProperty("option"))
+      ? meta.option
+      : JSON.parse(fs.readFileSync("../model/" + meta.option_file, "utf-8"))
 
 
     //console.log(option)
@@ -87,7 +89,7 @@
   const integratedLiquidLine = (magma, cmap) => {
     const differentiationLines = magma.custom.differentiationLineStack;
     const mixingLines = magma.custom.mixingLineStack;
-
+    const l = differentiationLines.length;
 
     return (x, y) => funcTools.zip(mixingLines)(differentiationLines).map(
       ([m, d], i) => {
@@ -107,20 +109,22 @@
               x: d[x],
               y: d[y],
               mode: "lines",
+              name: "growth " + (l - i - 1),
               line: {
                 width: 2,
                 color: cmap[i]
               }
-            },
+            }/*,
             {
               x: m[x],
               y: m[y],
               mode: "markers",
+              name: "mixing " + (l - i - 1),
               marker: {
                 size: 4,
                 color: cmap[i]
               }
-            }
+            }*/
           ]
         } else {
           return [
@@ -128,6 +132,7 @@
               x: m[x],
               y: m[y],
               mode: "markers",
+              name: "mixing " + (l - i - 1),
               marker: {
                 size: 4,
                 color: cmap[i]
@@ -137,6 +142,7 @@
               x: d[x],
               y: d[y],
               mode: "lines",
+              name: "growth " + (l - i - 1),
               line: {
                 width: 2,
                 color: cmap[i]

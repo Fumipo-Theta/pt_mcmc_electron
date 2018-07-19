@@ -90,7 +90,7 @@ class MCMCresult:
     
         plt.tight_layout()
         
-    def showSampleHist(self,burnIn=0,p_val=0,filterFunc=lambda csv: csv):
+    def showSampleHist(self,burnIn=0,p_val=0,bins=40,filterFunc=lambda csv: csv):
 
         data = filterFunc(self.csvData)
         
@@ -112,7 +112,7 @@ class MCMCresult:
             for i in range(0,dimX):
                 ax=fig.add_subplot(dimY,dimX,graphNum)
                 ax.hist(data[p+str(i)].sort_values()[lower:upper], 
-                        bins=40, 
+                        bins=bins, 
                         color=self.acceptedColor(self.meta["acceptedTime"][0][i][p]/self.dataLen), 
                         density=True)
                 ax.set_title(p+str(i),fontsize=28)
@@ -124,7 +124,7 @@ class MCMCresult:
     
         plt.tight_layout()
         
-    def showLnP(self, burnIn=0,p_val=0):
+    def showLnP(self, burnIn=0,p_val=0, bins=40):
         lower = int((self.dataLen - burnIn)*(0.+p_val*0.5))
         upper = int((self.dataLen - burnIn)*(1.-p_val*0.5))
 
@@ -140,14 +140,14 @@ class MCMCresult:
         
         ax2=fig.add_subplot(1,2,2)
         ax2.hist(self.csvData["lnP"][burnIn:].sort_values()[lower:upper],
-                 bins=40,
+                 bins=bins,
                  orientation="horizontal",
                 )
         ax2.set_ylim(ylim)
         ax2.set_title("$\ln P$",fontsize=28)
         ax2.tick_params(labelsize=32)
 
-    def writeSummary(self,burnIn=0, p_val=0, filterFunc=lambda csv:csv,  outputPath = "./summary.csv"):
+    def writeSummary(self,burnIn=0, p_val=0, bins=40, filterFunc=lambda csv:csv,  outputPath = "./summary.csv"):
         data = filterFunc(self.csvData[burnIn:self.dataLen])
         
         mean = data.mean()
@@ -164,7 +164,6 @@ class MCMCresult:
             sd.append(v)
 
 
-        binNum = 40
         md = []
 
         # 5%信用区間
@@ -172,7 +171,10 @@ class MCMCresult:
         upper = int((self.dataLen - burnIn)*(1.-p_val*0.5))
 
         for col in self.columnNames:
-            hist=np.histogram(data[col].sort_values()[lower:upper],bins=binNum)
+            hist=np.histogram(
+              data[col].sort_values()[lower:upper],
+              bins=bins
+              )
             md.append((hist[1][np.argmax(hist[0])]+hist[1][np.argmax(hist[0])+1])*0.5)
 
         max_P = data[data["lnP"] == np.max(data["lnP"])].values[0]
