@@ -823,11 +823,14 @@ if (typeof require === "undefined") {
       mixing_stoichiometry_spinel: (cand, i, parameter) => cand + parameter[i].growth_stoichiometry_orthopyroxene <= 1
     }
 
+    const mode = "estimator";
+
     return {
       model,
       parameters,
       updateCondition,
       constrain,
+      mode,
       magma
     };
   }

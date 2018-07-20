@@ -12,6 +12,8 @@
 }(this, function () {
   return _ => {
 
+    const mode = 'estimator';
+
     const model = (parameter, data) => {
       var m = {}
       m.x = data.x;
@@ -49,7 +51,8 @@
       model,
       parameters,
       updateCondition,
-      constrain
+      constrain,
+      mode
     };
   }
 }

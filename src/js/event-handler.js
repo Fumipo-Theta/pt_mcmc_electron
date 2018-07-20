@@ -174,6 +174,7 @@
                 "alpha": state.alpha,
                 "option": state.option
               });
+          state.seed = [];
           state.totalIteration = 0;
           state.isDirty = false;
           state.colorMap = palette("tol-rainbow", state.workerNum)

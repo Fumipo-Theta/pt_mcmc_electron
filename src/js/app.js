@@ -84,10 +84,11 @@
     ? _PTMCMC
     : require("../src/js/parallel-tempering.js");
 
-  const ptmcmc = new PTMCMC(200);
+  const ptmcmc = new PTMCMC(state.ptSeed);
   ptmcmc.setAction("initialize", (self, msg) => {
     console.log(self)
     console.log(msg);
+    state.seed[msg.id] = msg.seed;
     return msg
   })
     .setAction("sample", (self, msg) => {
@@ -105,6 +106,8 @@
       console.log("fullfilled")
       const meta = ((s) => {
         const list = [
+          "ptSeed",
+          "seed",
           "totalIteration",
           "workerNum",
           "alpha",

@@ -15,6 +15,8 @@
 
   const state = {
     "isDirty": true,
+    "ptSeed": 200,
+    "seed": [],
     "totalIteration": 0,
     "iteration": 200,
     "workerNum": 4,

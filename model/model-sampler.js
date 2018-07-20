@@ -9,6 +9,8 @@
 }(this, function () {
   return option => {
 
+    const mode = 'sampler';
+
     const model = (parameters, _) => {
       const { x, y } = parameters[0];
       const f = Math.exp(-x * x) * Math.exp(-y * y);
@@ -41,7 +43,8 @@
       model,
       parameters,
       updateCondition,
-      constrain
+      constrain,
+      mode
     };
   }
 }))

@@ -4,37 +4,30 @@ importScripts("./mcmc.js")
 this.postMessage({ "cmd": "", "msg": "start subprocess" })
 
 const mcmc = new MCMC();
-//const magma = new magma();
-
-const observer = {}
+const state = {}
 const self = this;
-let __model_optional_parameters__ = {}
-
-function replacer(k, v) {
-  if (typeof v === "function") { return v.toString() };
-  return v;
-}
-
-this.postMessage({ cmd: "", msg: "subprocess loaded" })
 
 this.addEventListener("message", function (ev) {
-  const { cmd, msg } = ev.data
+  const { cmd, msg } = ev.data;
 
   switch (cmd) {
 
     case "initialize":
-      observer.id = msg.id;
+      state.id = msg.id;
+
+      const seed = (msg.option.hasOwnProperty("seed"))
+        ? msg.option.seed[state.id]
+        : state.id
+
       importScripts("../../" + msg.model);
 
       const {
         model,
         parameters,
         updateCondition,
-        constrain
+        constrain,
+        mode
       } = Model(msg.option)
-
-
-      //console.log(model)
 
       mcmc.initialize(
         parameters,
@@ -42,10 +35,9 @@ this.addEventListener("message", function (ev) {
         constrain,
         msg.invT,
         msg.id,
-        (msg.option.hasOwnProperty("mode") && msg.option.mode === "sampler") ? "sampler" : "estimator"
+        mode
       )
-        .setSeed(msg.id)
-        .randomizeParameters([])
+        .setSeed(seed)
         .setObserved(
           msg.observed.data,
           msg.observed.error
@@ -54,11 +46,11 @@ this.addEventListener("message", function (ev) {
           model
         )
 
-
       self.postMessage({
         "cmd": "initialize", "msg": {
-          "id": observer.id,
-          "parameter": parameters
+          "id": state.id,
+          "parameter": parameters,
+          "seed": seed
         }
       })
       break;
@@ -66,7 +58,7 @@ this.addEventListener("message", function (ev) {
     case "sample":
       let result = { cmd: "sampled", msg: {} }
       result.msg = mcmc.samplingAndFormat(1);
-      result.msg.id = observer.id;
+      result.msg.id = state.id;
       result.msg.accepted = mcmc.acceptedTime;
       result.msg.modeled = mcmc.model;
       self.postMessage(result)
@@ -83,7 +75,7 @@ this.addEventListener("message", function (ev) {
       self.postMessage({
         "cmd": "",
         "msg": {
-          "id": observer.id,
+          "id": state.id,
           "accepted": mcmc.acceptedTime,
           "sampled": mcmc.sampledTime
         }
@@ -93,7 +85,7 @@ this.addEventListener("message", function (ev) {
     case "close":
       self.postMessage({
         "cmd": "closed",
-        "message": `${observer.id} closed`
+        "message": `${state.id} closed`
       })
       self.close();
       break;

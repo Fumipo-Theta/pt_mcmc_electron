@@ -112,7 +112,7 @@
 
 
     /**
-     * ptmcmc.createChain(
+     * ptmcmc.startSession(
           state.workerNum,
           {
             "observed": {
@@ -179,6 +179,21 @@
     }
 
     /**
+      * f:: alpha, n => Number
+      * 
+      * @param {Function} f 
+      */
+    setInvTParameter(alpha) {
+      this.getInvT = (i, initial, final) => (i === initial)
+        ? 1
+        : (i === final)
+          ? 0
+          : Math.pow(1 + alpha, -i);
+
+      return this;
+    }
+
+    /**
      * ptmcmc.startSampling(100, "z:/sample")
      * 
      * this method create output file whose path are:
@@ -205,20 +220,6 @@
       })
     }
 
-    /**
-     * f:: alpha, n => Number
-     * 
-     * @param {Function} f 
-     */
-    setInvTParameter(alpha) {
-      this.getInvT = (i, initial, final) => (i === initial)
-        ? 1
-        : (i === final)
-          ? 0
-          : Math.pow(1 + alpha, -i);
-
-      return this;
-    }
 
     /**
      * send message to all WebWorkers to sample 1 time
@@ -260,21 +261,18 @@
       return new Promise((res, rej) => {
         switch (cmd) {
           case "sampled":
-            /**
-             * Register sampled parameters and logarithm of posterior probability
-             */
             self.pending_workerNum--;
             self.storeSample(msg)
-              //.then(self.writeHeader.bind(self))
               .then(self.writeSample.bind(self))
               .then(self.action.sample(self))
               .then(_ => res(_))
-
             break;
+
           case "initialize":
             self.action.initialize(self)(msg)
               .then(_ => res(_))
             break;
+
           default:
             console.log(msg)
             res(true);
@@ -306,18 +304,15 @@
                   self.pending_workerNum = self.workerNum;
                   self.restJobTime--;
 
-                  // 残りのジョブ回数が0になったら終了処理
                   if (self.restJobTime > 0) {
                     self.dispatch();
                   } else {
-
                     res("fulfilled")
                   }
                 })
             }
           })
       })
-
     }
 
 
@@ -335,15 +330,11 @@
      * @param {Object} msg 
      */
     async writeSample(msg) {
-      const self = this;
-      //return new Promise((res, rej) => {
       const {
         parameter,
         lnP,
         id
       } = msg
-
-      const i = self.totalIteration;
 
       /**
        * If iteration is 1, write column names in output file
@@ -356,18 +347,15 @@
           })
         })
         arr.push("lnP")
-        const m = await this.output[id](fs.writeFile)(
+        await this.output[id](fs.writeFile)(
           arr.reduce((a, b) => a + "," + b) + "\n"
         )
       }
 
-      const n = await self.output[id](fs.appendFile)(
-        PTMCMC.parameterToCsv(i, parameter, lnP)
+      await this.output[id](fs.appendFile)(
+        PTMCMC.parameterToCsv(this.totalIteration, parameter, lnP)
       )
       return msg
-      //.then(_ => res(msg))
-      //res(msg)
-      //})
     }
 
     /**
@@ -420,20 +408,18 @@
       const self = this;
       return new Promise((res, rej) => {
 
+        // 現在のイテレーション回数の偶奇でworkerの組を変える
         const [ini, fin] = (isEven(self.totalIteration))
           ? [0, self.workerNum]
           : [1, self.workerNum - 1];
 
-        /**
-         * WebWorkerをqつ飛ばしのインデックスで処理
-         */
         take(
           parseInt((fin - ini) * 0.5),
           ini,
           2
         ).map(i => {
           /**
-           * MCMC間の遷移確率の計算
+           * 遷移確率がアンダーフローしないように対数で計算
            */
           const lnR = (self.invTs[i] - self.invTs[i + 1])
             * (self.lnPs[i + 1] - self.lnPs[i]);

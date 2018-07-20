@@ -17,8 +17,6 @@
   }
 }(this, function (_mt) {
 
-
-
   const mt = (typeof require === 'undefined' && typeof _mt === 'function')
     ? _mt
     : require("../../../jslib/mt");
@@ -341,8 +339,8 @@
      * 
      * @param {Bool} byLineElement
      */
-    sampling1set(byLineElement = false, _keys = []) {
-      const keys = (_keys.length === 0) ? Object.keys(this.updateStep) : _keys
+    sampling1set(byLineElement = false) {
+      const keys = Object.keys(this.updateStep)
       return this.getUpdateOrder(keys).map(v => this.sampling(v[1], v[0], byLineElement));
 
     }
@@ -364,10 +362,10 @@
      * @param {Bool} byLineElement
      * @return Object
      */
-    samplingAndFormat(times, byLineElement = false, _keys = []) {
+    samplingAndFormat(times, byLineElement = false) {
       const parameter = [];
       const lnP = [];
-      const keys = (_keys.length === 0) ? Object.keys(this.updateStep) : _keys;
+      const keys = Object.keys(this.updateStep);
       this.parameters.map((_, i) => {
         parameter[i] = {};
         keys.map(k => {
@@ -405,7 +403,7 @@
      * @param {[String]} keys
      * @return [Object]
      */
-    getUpdateOrder(keys) {
+    getUpdateOrder() {
       const combination = Array.prototype.concat(
         ...this.parameters
           .map((v, i) => {
