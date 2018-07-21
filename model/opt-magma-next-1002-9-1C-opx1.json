@@ -51,7 +51,7 @@
     1,
     1
   ],
-  "MgN_atRim": 86.,
+  "MgN_atRim": 86,
   "updateCondition": {
     "MgN_beforeCrystallization": {
       "val": 0.5,
