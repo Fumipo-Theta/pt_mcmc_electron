@@ -34,7 +34,7 @@
     ]
   }
 
-  const getDataAndModel_plotly = (data, error, model, primalyKey) => {
+  const getDataAndModel_plotly = (data, error, model, primaryKey) => {
     /**
      *  model: {
      *  x : [],
@@ -43,8 +43,8 @@
      * }
      */
     const xy = Object.keys(model)
-      .filter(v => v !== primalyKey)
-      .map(v => { return { x: primalyKey, y: v } });
+      .filter(v => v !== primaryKey)
+      .map(v => { return { x: primaryKey, y: v } });
     /**
      * xy = [{x:"x",y:"y"},{x:"x",y:"z"}]
      */
@@ -175,7 +175,7 @@
       state.data,
       state.error,
       msg.modeled,
-      state.primalyKey
+      state.primaryKey
     )
 
     const plot_parameter = getParameter_plotly(
