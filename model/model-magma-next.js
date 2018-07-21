@@ -672,10 +672,10 @@ if (typeof require === "undefined") {
         'targetPhase': option.targetPhase,
         'MgN_beforeMixing': option.MgN_atRim,
         'stoichiometry': {
-          'olivine': 1 - p.growth_stoichiometry_orthopyroxene
-            - p.growth_stoichiometry_spinel,
-          'orthopyroxene': p.growth_stoichiometry_orthopyroxene,
-          'spinel': p.growth_stoichiometry_spinel
+          'olivine': 1 - p.mixing_stoichiometry_orthopyroxene
+            - p.mixing_stoichiometry_spinel,
+          'orthopyroxene': p.mixing_stoichiometry_orthopyroxene,
+          'spinel': p.mixing_stoichiometry_spinel
         },
         'P': option.P[i]
       }
