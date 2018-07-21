@@ -10,7 +10,7 @@
     // like Node.
     module.exports = factory();
   } else {
-    // Browser globals (root is window)
+    // Browser global (root is window)
     root.MCMC = factory(
       root.MersenneTwister
     );
@@ -67,7 +67,7 @@
      *    fin: (cand, i, param) => (cand < param[i]["ini"])
      *  }
     */
-    initialize(parameters, vector, constrain, invT = 1, amplitude = 0) {
+    initialize(parameters, vector, constrain, invT = 1, amplitude = 0, mode = "estimator") {
       this.n = 0;
       this.parameters = clone(parameters);
       this.candidateParameters = clone(parameters);
@@ -79,6 +79,7 @@
       this.sampledTime = [];
       this.lnP = -100000000;
       this.lnPcand = -100000000;
+      this.samplerMode = (mode === "sampler") ? true : false;
 
       parameters.map((parameter, i) => {
         this.acceptedTime[i] = {};
@@ -222,13 +223,26 @@
       // When candidate is out of range, ignore.
       if (this.outRangeFlag) return this;
 
-      const modeled = this.modelFunc(this.candidateParameters, this.data);
-      this.model = modeled;
-      //console.log(modeled);
-      const lnP = (!byLineElement)
-        ? this.getAllLnProbabilityByPoint(modeled)
-        : this.getAllLnProbabilityByCurve(modeled)
+      this.model = this.modelFunc(this.candidateParameters, this.data);
 
+      //console.log(modeled);
+      const lnP = (byLineElement)
+        ? this.getAllLnProbabilityByCurve(this.model)
+        : this.getAllLnProbabilityByPoint(this.model)
+
+      this.lnPcand = (isFinite(lnP))
+        ? lnP
+        : -100000000
+
+      return this;
+    }
+
+    getSampleLikelihood() {
+      // When candidate is out of range, ignore.
+      if (this.outRangeFlag) return this;
+
+      this.model = this.modelFunc(this.candidateParameters);
+      const lnP = Math.log(this.model);
       this.lnPcand = (isFinite(lnP))
         ? lnP
         : -100000000
@@ -302,7 +316,12 @@
       //console.log(this)
       this.n++;
       this.candidate(key, i)
-      this.getLikelihood(byLineElement)
+      if (this.samplerMode) {
+        this.getSampleLikelihood()
+      } else {
+        this.getLikelihood(byLineElement)
+      }
+
       this.transaction(key, i)
       //console.log(this)
       return {

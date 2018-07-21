@@ -92,7 +92,8 @@
     outputDir: document.querySelector("#output_dir_input"),
     outputPrefix: document.querySelector("#output_prefix_input"),
     alpha: document.querySelector("#alpha_input"),
-    model: document.querySelector("#model_file_name_input")
+    model: document.querySelector("#model_file_name_input"),
+    plotInterval : document.querySelector("#plotInterval_input")
   }
 
   const dom_show = {
@@ -267,6 +268,15 @@
             state: state
           })
         })
+
+      dom_input.plotInterval 
+      .addEventListener("change",_=>{
+        publisher.publish("change_value",{
+          value:dom_input.plotInterval.value,
+          key:"plotInterval",
+          state : state
+        })
+      })
 
       document.querySelector("#option_file_select")
         .addEventListener("change", ev => {

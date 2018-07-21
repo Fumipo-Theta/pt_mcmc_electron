@@ -41,7 +41,8 @@ this.addEventListener("message", function (ev) {
         updateCondition,
         constrain,
         msg.invT,
-        msg.id * 0.1
+        msg.id,
+        (msg.option.hasOwnProperty("mode") && msg.option.mode === "sampler") ? "sampler" : "estimator"
       )
         .setSeed(msg.id)
         .randomizeParameters([])

@@ -133,7 +133,7 @@
       this.iteration = 0;
 
       /**
-       * construct n WebWorker oerating MCMC sampling
+       * construct n WebWorker operating MCMC sampling
        */
       this.deleteChain();
       this.workerNum = n;
