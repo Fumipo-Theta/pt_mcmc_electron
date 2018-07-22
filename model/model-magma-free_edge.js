@@ -811,10 +811,10 @@ if (typeof require === "undefined") {
     const constrain = {
       MgN_beforeCrystallization: (cand, i, parameter) => cand > parameter[i].MgN_beforeMixing,
       MgN_beforeMixing: (cand, i, parameter) => cand < parameter[i].MgN_beforeCrystallization,
-      growth_stoichiometry_orthopyroxene: (cand, i, parameter) => (0 < cand && cand + parameter[i].growth_stoichiometry_orthopyroxene <= 1),
+      growth_stoichiometry_orthopyroxene: (cand, i, parameter) => (0 < cand && cand + parameter[i].growth_stoichiometry_spinel <= 1),
       growth_stoichiometry_spinel: (cand, i, parameter) => cand + parameter[i].growth_stoichiometry_orthopyroxene <= 1,
-      mixing_stoichiometry_orthopyroxene: (cand, i, parameter) => (0 < cand && cand + parameter[i].growth_stoichiometry_orthopyroxene <= 1),
-      mixing_stoichiometry_spinel: (cand, i, parameter) => cand + parameter[i].growth_stoichiometry_orthopyroxene <= 1
+      mixing_stoichiometry_orthopyroxene: (cand, i, parameter) => (0 < cand && cand + parameter[i].mixing_stoichiometry_spinel <= 1),
+      mixing_stoichiometry_spinel: (cand, i, parameter) => cand + parameter[i].mixing_stoichiometry_orthopyroxene <= 1
     }
 
     const mode = "estimator";

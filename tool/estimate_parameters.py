@@ -91,6 +91,8 @@ class MCMCresult:
                     ax.set_title("stage "+str(stageNum), fontsize=36)
                 ax.tick_params(labelsize=36)
                 ax.set_frame_on(True)
+                ax.set_ylim([self.meta["option"]["updateCondition"][p]["min"],
+                             self.meta["option"]["updateCondition"][p]["max"]])
                 graphNum = graphNum + 1
                 stageNum = stageNum + 1
                 axs.append({

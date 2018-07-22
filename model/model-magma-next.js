@@ -819,10 +819,10 @@ if (typeof require === "undefined") {
       MgN_beforeMixing: (cand, i, parameter) => (i === parameter.length - 1)
         ? true
         : cand < parameter[i].MgN_beforeCrystallization,
-      growth_stoichiometry_orthopyroxene: (cand, i, parameter) => (0 < cand && cand + parameter[i].growth_stoichiometry_orthopyroxene <= 1),
+      growth_stoichiometry_orthopyroxene: (cand, i, parameter) => (0 < cand && cand + parameter[i].growth_stoichiometry_spinel <= 1),
       growth_stoichiometry_spinel: (cand, i, parameter) => cand + parameter[i].growth_stoichiometry_orthopyroxene <= 1,
-      mixing_stoichiometry_orthopyroxene: (cand, i, parameter) => (0 < cand && cand + parameter[i].growth_stoichiometry_orthopyroxene <= 1),
-      mixing_stoichiometry_spinel: (cand, i, parameter) => cand + parameter[i].growth_stoichiometry_orthopyroxene <= 1
+      mixing_stoichiometry_orthopyroxene: (cand, i, parameter) => (0 < cand && cand + parameter[i].mixing_stoichiometry_spinel <= 1),
+      mixing_stoichiometry_spinel: (cand, i, parameter) => cand + parameter[i].mixing_stoichiometry_orthopyroxene <= 1
     }
 
     const mode = "estimator";
