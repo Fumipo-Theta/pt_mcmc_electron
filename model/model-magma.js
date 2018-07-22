@@ -14,24 +14,25 @@
  *  in orthopyroxene
  */
 
-
-importScripts(
-  '../../../phase/js/geochem.js',
-  '../../../phase/js/chemical_profile.js',
-  '../../../phase/js/phase.js',
-  '../../../phase/js/liquid.js',
-  '../../../phase/js/solid.js',
-  '../../../jslib/matrix/matrix.js',
-  '../../../phase/js/equilibrate.js',
-  '../../../phase/js/partitioning.js',
-  '../../../phase/js/exchangePartitioning.js',
-  '../../../phase/js/geothermobarometer.js',
-  '../../../phase/js/magma-system.js',
-  '../../../jslib/funcTools.js',
-  '../../../diffusion/js/diffusion.js',
-  '../../../diffusion/js/inter-diffusion.js',
-  '../../../diffusion/js/self-diffusion.js'); // SelfDiffusion*/
-//console.log(this);
+if (typeof require === "undefined") {
+  importScripts(
+    '../../../phase/js/geochem.js',
+    '../../../phase/js/chemical_profile.js',
+    '../../../phase/js/phase.js',
+    '../../../phase/js/liquid.js',
+    '../../../phase/js/solid.js',
+    '../../../jslib/matrix/matrix.js',
+    '../../../phase/js/equilibrate.js',
+    '../../../phase/js/partitioning.js',
+    '../../../phase/js/exchangePartitioning.js',
+    '../../../phase/js/geothermobarometer.js',
+    '../../../phase/js/magma-system.js',
+    '../../../jslib/funcTools.js',
+    '../../../diffusion/js/diffusion.js',
+    '../../../diffusion/js/inter-diffusion.js',
+    '../../../diffusion/js/self-diffusion.js'); // SelfDiffusion*/
+  //console.log(this);
+}
 
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
@@ -48,20 +49,65 @@ importScripts(
       root.exchangePartitioning,
       root.MagmaSystem,
       root.InterDiffusion,
-      root.SelfDiffusion
+      root.SelfDiffusion,
+      root.Diffusion
     );
   }
 }(this, function (
-  Liquid,
-  Solid,
-  geothermobarometer,
-  Equilibrate,
-  D,
-  KD,
-  MagmaSystem,
-  InterDiffusion,
-  SelfDiffusion
+  _Liquid,
+  _Solid,
+  _geothermobarometer,
+  _Equilibrate,
+  _D,
+  _KD,
+  _MagmaSystem,
+  _InterDiffusion,
+  _SelfDiffusion,
+  _Diffusion
 ) {
+  const Liquid = (typeof require === 'undefined' && (typeof _Liquid === 'object' || typeof _Liquid === 'function'))
+    ? _Liquid
+    : require('../../phase/js/liquid');
+
+  const Solid = (typeof require === 'undefined' && (typeof _Solid === 'object' || typeof _Solid === 'function'))
+    ? _Solid
+    : require('../../phase/js/solid');
+
+  const geothermobarometer = (typeof require === 'undefined' && (typeof _geothermobarometer === 'object' || typeof _geothermobarometer === 'function'))
+    ? _geothermobarometer
+    : require('../../phase/js/geothermobarometer');
+
+
+  const Equilibrate = (typeof require === 'undefined' && (typeof _Equilibrate === 'object' || typeof _Equilibrate === 'function'))
+    ? _Equilibrate
+    : require('../../phase/js/equilibrate');
+
+  const D = (typeof require === 'undefined' && (typeof _D === 'object' || typeof _D === 'function'))
+    ? _D
+    : require('../../phase/js/partitioning');
+
+  const KD = (typeof require === 'undefined' && (typeof _KD === 'object' || typeof _KD === 'function'))
+    ? _KD
+    : require('../../phase/js/exchangePartitioning');
+
+  const MagmaSystem = (typeof require === 'undefined' && (typeof _MagmaSystem === 'object' || typeof _MagmaSystem === 'function'))
+    ? _MagmaSystem
+    : require('../../phase/js/magma-system');
+
+  const InterDiffusion = (typeof require === 'undefined' && (typeof _InterDiffusion === 'object' || typeof _InterDiffusion === 'function'))
+    ? _InterDiffusion
+    : require('../../diffusion/js/inter-diffusion');
+
+  const SelfDiffusion = (typeof require === 'undefined' && (typeof _SelfDiffusion === 'object' || typeof _SelfDiffusion === 'function'))
+    ? _SelfDiffusion
+    : require('../../diffusion/js/self-diffusion');
+
+  const Diffusion = (typeof require === 'undefined' && (typeof _Diffusion === 'object' || typeof _Diffusion === 'function'))
+    ? _Diffusion
+    : require('../../diffusion/js/diffusion');
+
+
+
   /**
    * option : {
    *  targetPhase: String,
@@ -69,7 +115,7 @@ importScripts(
    *    orthopyroxene : {
    *      Fe_Mg : {
    *        d0 : Number,
-   *        E : Numer
+   *        E : Number
    *      },
    *      Cr2O3 : {
    *        d0 : Number,
@@ -79,15 +125,16 @@ importScripts(
    *  },
    *  dF : Number,
    *  radius : [Number],
-   *  melt0 : {
+   *  finalMelt : {
    *    composition : {
    *      SiO2 : Number,
    *      ...
    *      H2O : Number
    *    },
-   *    Fe2Ratio : Number,
-   *    Pini : [Number]
-   *  }
+   *    Fe2Ratio : Number
+   *  },
+   *  P : [Number],
+   *  MgN_atRim : Number
    * }
    */
   return option => {
@@ -97,6 +144,10 @@ importScripts(
     /** Utility functions
      * 
      */
+    const repeatedArray = n => (array) => Array(n)
+      .fill(0)
+      .map(_ => [...array])
+      .reduce((a, b) => [...a, ...b]);
     const checkInRange = (min, max) => x => (min <= x && x <= max);
     const checkExceed = (target, sign = 1.) => x => (x - target) * sign > 0;
     const checkSame = (target, eps) => x => Math.abs(x - target) < eps;
@@ -169,9 +220,12 @@ importScripts(
      * @param {*} ope 
      */
     const initialize = (magma, ope) => {
-      const { targetPhase, D } = ope;
+      const { targetPhase, D, finalMelt } = ope;
 
       magma.setThermodynamicAgent(createPhase());
+      magma.phase.melt.setComposition(finalMelt.composition)
+        .setFe2Ratio(finalMelt.Fe2Ratio)
+        .compensateFe()
 
       const FeMgDif = new InterDiffusion('FeO', 'MgO', getD(D, targetPhase, 'Fe_Mg'), 'atom')
 
@@ -179,6 +233,9 @@ importScripts(
 
       magma.setDiffusionProfile(FeMgDif, targetPhase, 'Fe_Mg');
       magma.setDiffusionProfile(CrDif, targetPhase, 'Cr2O3');
+      magma.custom.profileStack = [];
+      magma.custom.mixingLineStack = [];
+      magma.custom.differentiationLineStack = [];
 
       return {}
     }
@@ -189,7 +246,7 @@ importScripts(
      *   during a reaction of melting or crystallization. 
      * It starts from a condition where the host melt has a specific composition. 
      * In each calculation step of, we calculate composition of solid phases 
-     *   by using partitioning coefficient assuming achivement of local equilibrium with host melt.
+     *   by using partitioning coefficient assuming achievement of local equilibrium with host melt.
      * Then, when crystal growth is considered, small fraction of solid phases are removed from the host melt. 
      * On the other hand, when assimilation of crystal is considered, they are added to the host melt. 
      * In the calculation, we use Mg# of some phase as an extent of progression of the reaction.
@@ -234,9 +291,15 @@ importScripts(
         phase.resetProfile(pathName);
       })
 
+      melt.resetProfile(pathName);
+
       // repeat until Mg# of targetPhase exceeds targetMgN or F becomes out of range [0,1]
       let limit = 0
-      while (isInRange(F) && !isExceed(observedPhase.getMgNumber())) {
+      melt.startDifferentiate();
+      while (isInRange(F)
+        && !isExceed(observedPhase.getMgNumber())
+        && !melt.outOfRange
+      ) {
         let { T, P } = magma.getThermodynamicProperty();
 
         // equilibrate & record
@@ -279,7 +342,7 @@ importScripts(
             dF * sign
           ).compensateFe()
 
-          // reequilibrate to check whether exceeding final condition
+          // re-equilibrate to check whether exceeding final condition
           solids.map(entry => {
             entry[1].equilibrate('melt', T, P)
           })
@@ -289,7 +352,7 @@ importScripts(
         }
         //=========================
 
-        // Update total fraction not exxceeding final condition
+        // Update total fraction not exceeding final condition
         F += dF;
 
         if (isSame(observedPhase.getMgNumber())) break;
@@ -303,9 +366,9 @@ importScripts(
         })
         melt.pushProfile(1 + F * sign, T, P, pathName);
       }
+      return pathName;
 
     }
-
 
 
 
@@ -324,46 +387,29 @@ importScripts(
      */
     const approximateMagmaMixing = (magma, ope, result) => {
       const {
-        initialMelt,
         dF,
         targetPhase,
-        ini,
-        orthopyroxeneInit,
-        spinelInit,
-        Pini,
-        Fe2Ratio
+        MgN_beforeMixing,
+        stoichiometry,
+        P
       } = ope
 
-      /** メルトの初期組成を設定し，ターゲット相の初期Mg#を求める
-       * 含水量を考慮した結晶分別を行う
-       * したがって，メルト温度に含水量の効果が反映され，net time scale of diffusion
-       * にも影響が出る
-      */
-
-      /* water, pressureはここでハンドル */
-      const water = (ope.hasOwnProperty('water'))
-        ? ope.water
-        : initialMelt.composition.H2O;
-
-      const stoichiometry = {
-        olivine: 1 - orthopyroxeneInit - spinelInit,
-        orthopyroxene: orthopyroxeneInit,
-        spinel: spinelInit
-      }
-
-      // メルト組成を計算
-      magma.phase.melt.setComposition(initialMelt.composition)
-        .updateComposition({ H2O: water })
-        .setFe2Ratio(Fe2Ratio)
-        .compensateFe()
-
-      // 圧力計を設定
       magma.setThermodynamicAgent({
-        barometer: _ => Pini
+        barometer: _ => P
       })
 
-      // 初生的なメルト組成を計算
-      recordLocalEquilibriumCondition(magma, targetPhase, ini, stoichiometry, dF, true)
+      const pathName = recordLocalEquilibriumCondition(
+        magma,
+        targetPhase,
+        MgN_beforeMixing,
+        stoichiometry,
+        dF,
+        true
+      )
+
+      magma.custom.mixingLineStack.push(
+        magma.phase.melt.profile[pathName].get()
+      )
 
       return {}
     }
@@ -388,19 +434,34 @@ importScripts(
       const {
         dF,
         targetPhase,
-        fin,
-        orthopyroxeneInit,
-        spinelInit
+        MgN_beforeCrystallization,
+        stoichiometry,
+        P
       } = ope;
 
-      const stoichiometry = {
-        olivine: 1 - orthopyroxeneInit - spinelInit,
-        orthopyroxene: orthopyroxeneInit,
-        spinel: spinelInit
-      }
+      magma.setThermodynamicAgent({
+        barometer: _ => P
+      })
 
       // 結晶成長を伴うメルト組成変化
-      recordLocalEquilibriumCondition(magma, targetPhase, fin, stoichiometry, dF, true)
+      const pathName = recordLocalEquilibriumCondition(
+        magma,
+        targetPhase,
+        MgN_beforeCrystallization,
+        stoichiometry,
+        dF,
+        true
+      )
+      /**
+        * 注目する相のプロファイルをスタックに追加
+        */
+      magma.custom.profileStack.push(
+        magma.phase[targetPhase].profile[pathName].get()
+      )
+
+      magma.custom.differentiationLineStack.push(
+        magma.phase.melt.profile[pathName].get()
+      )
       return {}
     }
 
@@ -415,7 +476,16 @@ importScripts(
      */
     const massToRadiusByConstantDensity = (initialRadius, finalRadius, totalMass) => {
       const A = (Math.pow(finalRadius, 3) - Math.pow(initialRadius, 3)) / totalMass;
-      return f => Math.pow(A * f + Math.pow(initialRadius, 3), 1 / 3)
+      return f => Math.pow(A * (totalMass - f) + Math.pow(initialRadius, 3), 1 / 3)
+    }
+
+    const reverseProfile = (profile) => {
+      const newProfile = {};
+      Object.entries(profile)
+        .map(([k, v]) => {
+          newProfile[k] = [...v].reverse()
+        })
+      return newProfile;
     }
 
     /**
@@ -426,29 +496,29 @@ importScripts(
      * @param {*} Rini 
      * @param {*} Rfin 
      */
-    const getProfileWithRadius = (magma, targetPhase, Rini, Rfin) => {
-      const profile = magma.phase[targetPhase].getProfile('descend');
-      const l = profile.F.length;
-      profile.x = profile.F.map(massToRadiusByConstantDensity(Rini, Rfin, profile.F[l - 1]));
-      return profile;
+    const getProfileWithRadius = (profile, Rini, Rfin) => {
+      const newProfile = Object.assign(profile, {});
+      const l = newProfile.F.length;
+      newProfile.x = newProfile.F.map(massToRadiusByConstantDensity(Rini, Rfin, newProfile.F[0]));
+      return newProfile;
     }
 
     /**
      * Simulate elemental diffusion in the focused crystal. 
      * The crystal is spherical symmetry. 
-     * Diffusion coefficients depends only on temperature as Arhenius relation. 
+     * Diffusion coefficients depends only on temperature as Arrhenius relation. 
      * 
      * In the model, inter diffusivity of Fe and Mg components and self diffusivity of Cr2O3 are 
      *  considered. 
      * During diffusion, the host melt composition is constant and local equilibrium at crystal surface
      *  always established. 
      * 
-     * Spatially one dimension diffusion equation is numerycally solved by Crank-Nicolson method. 
+     * Spatially one dimension diffusion equation is numerically solved by Crank-Nicolson method. 
      * Neumann condition at the center of crystal, and Dericklet condition at the edge. 
      * 
      * The scale of time and temperature for diffusivity is treated as unknown parameter, 'total scale of diffusion'. 
      * The scale is originally introduced by Lasaga (1983) as compressed time. 
-     * Total scale of diffusion represent all possible cooling history which yeild the same value of compressed time. 
+     * Total scale of diffusion represent all possible cooling history which yields the same value of compressed time. 
      * 
      * @param {MagmaSystem} magma 
      * @param {*} ope 
@@ -458,7 +528,11 @@ importScripts(
       const { targetPhase, tau, R, Rprev, divNum } = ope;
 
       // chemical profileを取得
-      const section = getProfileWithRadius(magma, targetPhase, Rprev, R)
+      const profile = (magma.custom.profileStack.length > 0)
+        ? reverseProfile(magma.custom.profileStack.pop())
+        : {};
+
+      const section = getProfileWithRadius(profile, Rprev, R)
 
       const diffusionInSphere = magma.getDiffusionProfile(targetPhase);
       Object.values(diffusionInSphere).map(d => {
@@ -474,15 +548,32 @@ importScripts(
     }
 
     /** 
-     * Assumed crustal processes are repeatation of magma mixing, crystal growth, 
+     * Assumed crustal processes are reputation of magma mixing, crystal growth, 
      *   and elemental diffusion in crystals.
-     * The time of repeatation is the same as number of growth satge of the focused crystal. 
+     * The time of reputation is the same as number of growth stage of the focused crystal. 
+     * 
+     * eruptedMelt =>
+     * ascend(push profile) -> beforeMixing ->
+     * ascend(push profile) -> beforeMixing ->
+     * ...->
+     * ascend(push profile)
+     * => primaryMelt
+     * 
+     * then 
+     * section.push(reverse(profileStack.pop()))
+     *  .diffuse()
+     *  .push(reverse(profileStack.pop()))
+     *  .diffuse()
+     *  ...
     */
-    const magmaProcesses = option.radius.map((_, i) => {
-      return (i === 0)
-        ? []
-        : [approximateMagmaMixing, growCrystals, operateDiffusion]
-    }).reduce((a, b) => [...a, ...b], [])
+    const repeat = repeatedArray(option.radius.length - 1);
+    /**
+     * 噴出マグマから初生マグマまで結晶成長とマグマ混合をさかのぼっていく
+     */
+    const magmaProcessesSequence = [
+      ...repeat([approximateMagmaMixing, growCrystals]),
+      ...repeat([operateDiffusion])
+    ]
 
     /** 
      * MagmaSystemに登録されたある相の拡散プロファイルを統合し, 
@@ -507,7 +598,7 @@ importScripts(
       }).reduce((a, b) => Object.assign(a, b), {})
     }
 
-    //console.log(magmaProcesses)
+    //console.log(magmaProcessesSequence)
     /** Create magma system 
      * 
      */
@@ -524,7 +615,7 @@ importScripts(
       )
       .setAction([
         initialize,
-        ...magmaProcesses
+        ...magmaProcessesSequence
       ])
       .setFinalAction(
         integrateDiffusedProfile
@@ -538,7 +629,7 @@ importScripts(
      * The crystals are spherical symmetry. 
      * The crystal experiences multiple stages of crystal growth and lattice diffusion.
      * The lattice diffusion progresses after crystal growth terminated in each stage.
-     * The chemical composition of grown crystal determined by host melt compositon and partitioning coefficients. 
+     * The chemical composition of grown crystal determined by host melt composition and partitioning coefficients. 
      * 
      * 
      * @param {Array} parameters
@@ -559,42 +650,94 @@ importScripts(
      *  @property {Array} Fe_Mg
      *  @property {Array} Cr2O3
      */
-    const model = (parameters, data) => {
-      const modelParameters = parameters.map((p, i) => {
-        return [
-          {
-            'initialMelt': option.melt0,
-            'dF': option.dF,
-            'targetPhase': option.targetPhase,
-            'ini': p.ini,
-            'orthopyroxeneInit': p.orthopyroxeneInit,
-            'spinelInit': p.spinelInit,
-            'Fe2Ratio': option.melt0.Fe2Ratio,
-            'Pini': option.Pini[i]
-          },
-          {
-            'dF': option.dF,
-            'targetPhase': option.targetPhase,
-            'fin': p.fin,
-            'orthopyroxeneInit': p.orthopyroxeneInit,
-            'spinelInit': p.spinelInit,
-          },
-          {
-            'targetPhase': option.targetPhase,
-            'tau': p.log10_tau,
-            'R': option.radius[i + 1],
-            'Rprev': option.radius[i],
-            'divNum': (i + 1) * 10
-          }
-        ]
-      }).reduce((a, b) => [...a, ...b], []);
+    const getParameterGrowth = (p, i, option) => {
+      return {
+        'dF': option.dF,
+        'targetPhase': option.targetPhase,
+        'MgN_beforeCrystallization': p.MgN_beforeCrystallization,
+        'stoichiometry': {
+          'olivine': 1 - p.growth_stoichiometry_orthopyroxene
+            - p.growth_stoichiometry_spinel,
+          'orthopyroxene': p.growth_stoichiometry_orthopyroxene,
+          'spinel': p.growth_stoichiometry_spinel
+        },
+        /*'Fe2Ratio': option.melt0.Fe2Ratio, include in option.melt*/
+        'P': option.P[i]
+      }
+    }
+
+    const getParameterGrowthRim = (p, i, option) => {
+      return {
+        'dF': option.dF,
+        'targetPhase': option.targetPhase,
+        'MgN_beforeMixing': option.MgN_atRim,
+        'stoichiometry': {
+          'olivine': 1 - p.growth_stoichiometry_orthopyroxene
+            - p.growth_stoichiometry_spinel,
+          'orthopyroxene': p.growth_stoichiometry_orthopyroxene,
+          'spinel': p.growth_stoichiometry_spinel
+        },
+        'P': option.P[i]
+      }
+    }
+
+    const getParameterMixing = (p, i, option) => {
+      return {
+        'dF': option.dF,
+        'targetPhase': option.targetPhase,
+        'MgN_beforeMixing': p.MgN_beforeMixing,
+        'stoichiometry': {
+          'olivine': 1 - p.mixing_stoichiometry_orthopyroxene
+            - p.mixing_stoichiometry_spinel,
+          'orthopyroxene': p.mixing_stoichiometry_orthopyroxene,
+          'spinel': p.mixing_stoichiometry_spinel
+        },
+        'P': option.P[i]
+      }
+    }
+
+    const getParameterDiffusion = (p, i, option) => {
+      return {
+        'targetPhase': option.targetPhase,
+        'tau': p.log10_tau,
+        'R': option.radius[i + 1],
+        'Rprev': option.radius[i],
+        'divNum': (i + 1) * 10
+      }
+    }
+
+    const model = (_parameters, data) => {
+      // new
+      const parameters = [..._parameters];
+
+      const parametersLiquidLine = [];
+      const parametersDiffusion = [];
+      const last = parameters.length - 1;
+      let i = last
+      while (i >= 0) {
+        let p = parameters.pop();
+        if (i === last) {
+          parametersLiquidLine.push(getParameterGrowthRim(p, i, option));
+        } else {
+          parametersLiquidLine.push(getParameterMixing(p, i, option));
+        }
+        parametersLiquidLine.push(getParameterGrowth(p, i, option));
+        parametersDiffusion.push(getParameterDiffusion(p, last - i, option));
+        i--;
+      }
+
+      const modelParameters = [
+        ...parametersLiquidLine,
+        ...parametersDiffusion
+      ];
 
       //console.log(modelParameters)
 
       return magma.execAction([
         {
           'targetPhase': option.targetPhase,
-          'D': option.D0
+          'D': option.D0,
+          'finalMelt': option.finalMelt,
         },
         ...modelParameters,
         {
@@ -609,12 +752,14 @@ importScripts(
     /**
      * Initial value of parameters are not important.
      */
-    const parameters = Array(9).fill(0).map((_, i) => {
+    const parameters = Array(option.radius.length - 1).fill(0).map((_) => {
       return {
-        'ini': 85,
-        'fin': 80,
-        'orthopyroxeneInit': 0.5,
-        'spinelInit': 0.05,
+        'MgN_beforeCrystallization': 85,
+        'growth_stoichiometry_orthopyroxene': 0.5,
+        'growth_stoichiometry_spinel': 0.05,
+        'MgN_beforeMixing': 80,
+        'mixing_stoichiometry_orthopyroxene': 0.5,
+        'mixing_stoichiometry_spinel': 0.05,
         'log10_tau': 6
       }
     });
@@ -622,46 +767,73 @@ importScripts(
     /**
      * In the model, initial and final Mg# of the orthopyroxene phenocryst during crystal growth are unknown parameters. 
      */
-    const updateCondition = {
-      'ini': {
-        'val': 1,
-        'max': 93,
-        'min': 75
-      },
-      'fin': {
-        'val': 1,
-        'max': 93,
-        'min': 75
-      },
-      'orthopyroxeneInit': {
-        'val': 0.05,
-        'max': 1,
-        'min': 0
-      },
-      'spinelInit': {
-        'val': 0.005,
-        'max': 0.1,
-        'min': 0
-      },
-      'log10_tau': {
-        'val': 0.1,
-        'max': 12,
-        'min': 0
+    const updateCondition = (option.hasOwnProperty("updateCondition"))
+      ? option.updateCondition
+      : {
+        'MgN_beforeCrystallization': {
+          'val': 0.5,
+          'max': 93,
+          'min': 75
+        },
+        'growth_stoichiometry_orthopyroxene': {
+          'val': 0.05,
+          'max': 1,
+          'min': 0
+        },
+        'growth_stoichiometry_spinel': {
+          'val': 0.005,
+          'max': 0.1,
+          'min': 0
+        },
+        'MgN_beforeMixing': {
+          'val': 0.5,
+          'max': 93,
+          'min': 75
+        },
+        'mixing_stoichiometry_orthopyroxene': {
+          'val': 0.05,
+          'max': 1,
+          'min': 0
+        },
+        'mixing_stoichiometry_spinel': {
+          'val': 0.005,
+          'max': 0.1,
+          'min': 0
+        },
+        'log10_tau': {
+          'val': 0.1,
+          'max': 12,
+          'min': 0
+        }
       }
+
+    /**
+     * 結晶化前のMg#は結晶化後のMg#, すなわちマグマ混合前のMg#より大きい.
+     * 最外部のセクションの結晶化前のMg#は結晶のリムのMg#より大きい.
+     * 
+     */
+    const constrain = {
+      MgN_beforeCrystallization: (cand, i, parameter) => (i === parameter.length - 1)
+        ? cand > option.MgN_atRim
+        : cand > parameter[i].MgN_beforeMixing,
+      MgN_beforeMixing: (cand, i, parameter) => (i === parameter.length - 1)
+        ? true
+        : cand < parameter[i].MgN_beforeCrystallization,
+      growth_stoichiometry_orthopyroxene: (cand, i, parameter) => (0 < cand && cand + parameter[i].growth_stoichiometry_orthopyroxene <= 1),
+      growth_stoichiometry_spinel: (cand, i, parameter) => cand + parameter[i].growth_stoichiometry_orthopyroxene <= 1,
+      mixing_stoichiometry_orthopyroxene: (cand, i, parameter) => (0 < cand && cand + parameter[i].growth_stoichiometry_orthopyroxene <= 1),
+      mixing_stoichiometry_spinel: (cand, i, parameter) => cand + parameter[i].growth_stoichiometry_orthopyroxene <= 1
     }
 
-    const constrain = {
-      ini: (cand, i, parameter) => cand > parameter[i].fin,
-      fin: (cand, i, parameter) => cand < parameter[i].ini,
-      orthopyroxeneInit: (cand, i, parameter) => (0 < cand && cand + parameter[i].spinelInit <= 1),
-      spinelInit: (cand, i, parameter) => cand + parameter[i].orthopyroxeneInit <= 1
-    }
+    const mode = "estimator";
 
     return {
       model,
       parameters,
       updateCondition,
-      constrain
+      constrain,
+      mode,
+      magma
     };
   }
 }

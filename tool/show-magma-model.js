@@ -23,6 +23,12 @@
     }
   }
 
+  const read = {
+    csv: path => tf.text2Dataframe(fs.readFileSync(path, "utf-8"), "csv"),
+    json: path => JSON.parse(fs.readFileSync(path, "utf-8"))
+    //console.log(meta)
+  }
+
   const fetchData = (rp, dp) => {
     const metaFiles = ls(rp)(path => file => fs.statSync(path + file).isFile() && /^meta.*\.json$/.test(file))
     const sampleFiles = ls(rp)(path => file => fs.statSync(path + file).isFile() && /.*\.csv$/.test(file))
@@ -30,20 +36,20 @@
     //console.log(metaFiles)
     //console.log(sampleFiles)
 
-    const meta = JSON.parse(fs.readFileSync(`${metaFiles.directory}${metaFiles.files.pop()}`))
-    //console.log(meta)
+    const meta = read.json(`${metaFiles.directory}${metaFiles.files.pop()}`)
 
-    const data = tf.text2Dataframe(fs.readFileSync(`${dp}${meta.data_file}`, "utf-8"), "csv")
-    const error = tf.text2Dataframe(fs.readFileSync(`${dp}${meta.data_file}`, "utf-8"), "csv")
+    const data = read.csv(`${dp}${meta.data_file}`)
+
+    const error = read.csv(`${dp}${meta.data_file}`)
+
     const option = (meta.hasOwnProperty("option"))
       ? meta.option
-      : JSON.parse(fs.readFileSync("../model/" + meta.option_file, "utf-8"))
+      : read.json("../model/" + meta.option_file)
 
+    const summary = read.csv(`${summaryFiles.directory}${summaryFiles.files[0]}`)
 
-    //console.log(option)
-
-    const summary = tf.text2Dataframe(fs.readFileSync(`${summaryFiles.directory}${summaryFiles.files[0]}`, "utf-8"), "csv")
     console.log("Summary column", Object.keys(summary))
+
     return {
       meta,
       data,
@@ -52,6 +58,8 @@
       summary
     }
   }
+
+
 
   const getSummarizedParameters = (df, by, initial_parameters) => {
     const ps = [...initial_parameters];
@@ -157,6 +165,7 @@
 
 
   return {
+    read,
     fetchData,
     getSummarizedParameters,
     groupEachStage,
