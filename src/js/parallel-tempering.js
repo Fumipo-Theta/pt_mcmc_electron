@@ -34,7 +34,11 @@
     }
     : require("fs.promises")
 
-
+  /*
+	if (typeof Worker === "undefined" && typeof require !== 'undefined'){
+		var {Worker} = require("webworker-threads");
+	}
+  */
 
   const take = (n, ini = 0, acc = 1) => Array(n).fill(0).map((_, i) => ini + acc * i);
   const isEven = num => (num * 0.5 - parseInt(num * 0.5) <= 0);

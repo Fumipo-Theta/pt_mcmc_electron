@@ -15,19 +15,20 @@
   "license": "ISC",
   "dependencies": {
     "asciidoctor.js": "^1.5.7-rc.1",
-    "d3": "^5.4.0",
+    "d3": "^5.5.0",
     "fs-extra": "^6.0.1",
     "fs.promises": "^0.1.2",
-    "hyperapp": "^1.2.5",
+    "hyperapp": "^1.2.8",
     "ijavascript-plotly": "0.0.1",
     "jszip": "^3.1.5",
     "marked": "^0.4.0",
-    "node-fetch": "^2.1.2",
-    "nodemailer": "^4.6.5",
-    "plotly.js": "^1.38.1"
+    "node-fetch": "^2.2.0",
+    "nodemailer": "^4.6.7",
+    "plotly.js": "^1.39.2",
+    "webworker-threads": "^0.7.16"
   },
   "devDependencies": {
-    "electron": "^2.0.2",
-    "node-gyp": "^3.6.2"
+    "electron": "^2.0.5",
+    "node-gyp": "^3.7.0"
   }
 }

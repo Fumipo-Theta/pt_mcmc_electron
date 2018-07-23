@@ -17,13 +17,14 @@
           - ((x - mu) * (x - mu)) / (2 * sigma * sigma)
         )
     }
-    const gauss1 = Gauss(1, 1);
-    const gauss2 = Gauss(5, 2);
-    const gauss3 = Gauss(-2, 3);
-
+    const g1 = Gauss(1,1);
+		const g2 = Gauss(5,2);
+		const g3 = Gauss(-5,1.5);
+		const mixedGauss = x => g1(x) + g2(x) + g3(x)
+    
     const model = (parameters, _) => {
       const { x } = parameters[0];
-      const f = gauss1(x) + gauss2(x) + gauss3(x);
+      const f = mixedGauss(x);
       return f
     };
 
