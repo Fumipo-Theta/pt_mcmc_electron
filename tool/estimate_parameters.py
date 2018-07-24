@@ -2,6 +2,7 @@ import os
 import json
 import numpy as np
 import pandas as pd
+from scipy.stats import kde
 import matplotlib.pyplot as plt
 
 import matplotlib.cm as cm
@@ -26,6 +27,17 @@ def fileList(dir, func):
 class MCMCresult:
     def __init__(self):
         self.acceptedColor = generate_cmap(["#bb0000", "#888888", "#0000bb"])
+
+    def readMelt(self, stageNumber, rootDir="./"):
+        self.melt = pd.concat(
+            list(
+                map(pd.read_csv,
+                    fileList(rootDir, lambda file: file.find(
+                        "melt_"+str(stageNumber)) >= 0)
+                    )
+            ),
+            ignore_index=True
+        )
 
     def readMeta(self, rootDir="./"):
         metaFile = open(
@@ -175,6 +187,8 @@ class MCMCresult:
     def writeSummary(self, burnIn=0, p_val=0, bins=40, filterFunc=lambda csv: csv,  outputPath="./summary.csv"):
         data = filterFunc(self.csvData[burnIn:self.dataLen])
 
+        print("data number: ", len(data))
+
         mean = data.mean()
         me = []
 
@@ -218,3 +232,41 @@ class MCMCresult:
         display(df)
 
         df.to_csv(outputPath)
+
+    def showMeltTransition(self, elementFunc, burnIn=0):
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(1, 1, 1)
+        ax.plot(elementFunc(self.melt))
+        ax.tick_params(labelsize=32)
+        return ax
+
+    def showMeltHistogram(self, elementFunc, burnIn=0, p_val=0, bins=40, filterFunc=lambda csv: csv):
+        data = filterFunc(self.melt[burnIn:len(self.melt)])
+        lower = int((self.dataLen - burnIn)*(0.+p_val*0.5))
+        upper = int((self.dataLen - burnIn)*(1.-p_val*0.5))
+
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(1, 1, 1)
+        ax.hist(elementFunc(data).sort_values()[lower:upper],
+                bins=bins,
+                density=True)
+        ax.tick_params(labelsize=32)
+        return ax
+
+    def showMeltKde(self, e1, e2, burnIn=0, nbins=100, filterFunc=lambda csv: csv):
+        data = filterFunc(self.melt[burnIn:len(self.melt)])
+        x = data[e1]
+        y = data[e2]
+
+        k = kde.gaussian_kde([x, y])
+        xi, yi = np.mgrid[x.min():x.max():nbins*1j, y.min():y.max():nbins*1j]
+        zi = k(np.vstack([xi.flatten(), yi.flatten()]))
+
+        # Make the plot
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(1, 1, 1)
+        ax.pcolormesh(xi, yi, zi.reshape(xi.shape))
+        ax.tick_params(labelsize=32)
+        ax.set_xlabel(e1, fontsize=30)
+        ax.set_ylabel(e2, fontsize=30)
+        return ax

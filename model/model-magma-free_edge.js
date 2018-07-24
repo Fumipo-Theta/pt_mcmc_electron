@@ -706,7 +706,7 @@ if (typeof require === "undefined") {
       }
     }
 
-    const model = (_parameters, data) => {
+    const model = (_parameters, data, isMCMC = true) => {
       // new
       const parameters = [..._parameters];
 
@@ -729,7 +729,7 @@ if (typeof require === "undefined") {
 
       //console.log(modelParameters)
 
-      return magma.execAction([
+      const modeled = magma.execAction([
         {
           'targetPhase': option.targetPhase,
           'D': option.D0,
@@ -741,6 +741,10 @@ if (typeof require === "undefined") {
           'dataPos': data.x
         }
       ])
+
+      return (isMCMC)
+        ? modeled
+        : magma
 
     }
 
