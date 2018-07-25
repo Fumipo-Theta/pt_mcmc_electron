@@ -50,12 +50,14 @@
       return {
         parameters: this.parameters,
         lnP: this.lnP,
-        rand: this.rand.getInternalState()
+        rand: this.rand.getInternalState(),
+        acceptedTime : this.acceptedTime
       };
     }
 
     setInternalState(state) {
       this.overWrite(state.parameters, state.lnP);
+      this.acceptedTime = state.acceptedTime;
       this.rand.setInternalState(state.rand);
     }
 

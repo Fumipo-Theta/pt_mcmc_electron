@@ -162,7 +162,7 @@
           
 
           ptmcmc
-            .startSession(
+            .reStartSession(
               state.workerNum,
               {
                 "observed": {

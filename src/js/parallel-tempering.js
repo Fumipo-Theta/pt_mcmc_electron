@@ -99,7 +99,8 @@
         totalIteration: this.totalIteration,
         lnPStorage: this.lnPStorage,
         parameterStorage: this.parameterStorage,
-        rand: this.rand.getInternalState()
+        rand: this.rand.getInternalState(),
+        exchangeTime : this.exchangeTime
       }
     }
 
@@ -108,6 +109,7 @@
       this.lnPStorage = state.lnPStorage;
       this.parameterStorage = state.parameterStorage;
       this.rand.setInternalState(state.rand);
+      this.exchangeTime = state.exchangeTime;
       return this;
     }
 
