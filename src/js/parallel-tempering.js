@@ -96,6 +96,7 @@
 
     getInternalState() {
       return {
+        totalIteration: this.totalIteration,
         lnPStorage: this.lnPStorage,
         parameterStorage: this.parameterStorage,
         rand: this.rand.getInternalState()
@@ -103,9 +104,10 @@
     }
 
     setInternalState(state) {
-      this.lnPStorage = state.lnPStorage,
-        this.parameterStorage = state.parameterStorage,
-        this.rand.setInternalState(state.rand);
+      this.totalIteration = state.totalIteration;
+      this.lnPStorage = state.lnPStorage;
+      this.parameterStorage = state.parameterStorage;
+      this.rand.setInternalState(state.rand);
       return this;
     }
 
@@ -130,6 +132,7 @@
     }
 
 
+
     /**
      * ptmcmc.startSession(
           state.workerNum,
@@ -145,10 +148,17 @@
      * @param {Object} opt
      * @param {String} workerPath
      */
-    startSession(n, opt, totalIteration = 0, workerPath = "../src/js/mcmcWorker.js") {
+    startSession(n, opt, workerPath = "../src/js/mcmcWorker.js") {
+      this.totalIteration = 0;
+
+      this.parameterStorage = take(n).map(_ => []);
+      this.lnPStorage = take(n).map(_ => []);
+      this.reStartSession(n, opt, workerPath);
+    }
+
+    reStartSession(n, opt, workerPath = "../src/js/mcmcWorker.js") {
       const self = this;
       this.restJobTime = 0;
-      this.totalIteration = totalIteration;
       this.iteration = 0;
 
       /**
@@ -157,10 +167,7 @@
       this.deleteChain();
       this.workerNum = n;
       this.mcmcWorkers = take(n).map(_ => new Worker(workerPath))
-      if (totalIteration === 0) {
-        this.parameterStorage = take(n).map(_ => []);
-        this.lnPStorage = take(n).map(_ => []);
-      }
+
       this.mcmcStateStorage = take(n).map(_ => []);
 
       /**

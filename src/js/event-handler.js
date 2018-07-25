@@ -159,7 +159,7 @@
 
           document.querySelector("#error_file_name").innerHTML = state.error_file;
           state.mcmcInternalState = meta.mcmcInternalState;
-          ptmcmc.setInternalState(meta.ptmcmcInternalState)
+          
 
           ptmcmc
             .startSession(
@@ -172,9 +172,9 @@
                 "model": state.model,
                 "alpha": state.alpha,
                 "option": state.option
-              },
-              state.totalIteration
+              }
             );
+          ptmcmc.setInternalState(meta.ptmcmcInternalState)
           ptmcmc.restoreInternalStateOfMCMC(state.mcmcInternalState);
           state.colorMap = palette("tol-rainbow", state.workerNum)
           state.totalIteration += parseInt(state.iteration);
@@ -293,6 +293,7 @@
           state: state,
           ptmcmc: ptmcmc
         })
+        start_button.value = "Start"
         return false
       }
 
