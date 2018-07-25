@@ -6,7 +6,7 @@
   } else {
     root.eventHandler = factory(
       root.PubSub,
-      root.textFile,
+      root.TextParser,
       root.palette,
       root.ModalMedia
     );
@@ -19,7 +19,7 @@
 
   const tf = (typeof require === 'undefined' && (typeof _tf === 'object' || typeof _tf === 'function'))
     ? _tf
-    : require("../../../jslib/textFile.js");
+    : require("../../../jslib/textParser.js");
 
   const palette = (typeof require === 'undefined' && (typeof _palette === 'object' || typeof _palette === 'function'))
     ? _palette
@@ -73,10 +73,10 @@
    * クォーテーションマークを削除, 
    * することでFunction.toString()されたも含めてjavascriptコードとして認識されるようにしている
    * 
-   * @param {String} data 
+   * @param {String} text 
    * @param {String} title 
    */
-  const data2md_code = (data, title = "") => '## ' + title + '\n```javascript\n' + data.replace(/\\r\\n/g, "\n").replace(/\\"/g, "").replace(/"/g, "") + '\n```'
+  const text2md_code = (text, title = "") => '## ' + title + '\n```javascript\n' + text.replace(/\\r\\n/g, "\n").replace(/\\"/g, "").replace(/"/g, "") + '\n```'
 
   const { media, modalWindowPublisher } = ModalMedia(
     document.querySelector("#modal_container"),
@@ -335,7 +335,7 @@
             : "../"
           fetchFunc(prefix + state.model, "utf8")
             .then(res => {
-              media.show(data2md_code(res, "Model"));
+              media.show(text2md_code(res, "Model"));
             });
         },
         false
@@ -352,7 +352,7 @@
       dom_show.option.addEventListener("click",
         ev => {
           modalWindowPublisher.publish("open");
-          media.show(data2md_code(JSON.stringify(state.option, null, 2), "External parameters"));
+          media.show(text2md_code(JSON.stringify(state.option, null, 2), "External parameters"));
         },
         false
       )

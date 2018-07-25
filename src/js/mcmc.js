@@ -46,6 +46,19 @@
       return this;
     }
 
+    getInternalState() {
+      return {
+        parameters: this.parameters,
+        lnP: this.lnP,
+        rand: this.rand.getInternalState()
+      };
+    }
+
+    setInternalState(state) {
+      this.overWrite(state.parameters, state.lnP);
+      this.rand.setInternalState(state.rand);
+    }
+
     /**
      *
      *

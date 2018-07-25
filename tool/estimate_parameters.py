@@ -242,8 +242,8 @@ class MCMCresult:
 
     def showMeltHistogram(self, elementFunc, burnIn=0, p_val=0, bins=40, filterFunc=lambda csv: csv):
         data = filterFunc(self.melt[burnIn:len(self.melt)])
-        lower = int((self.dataLen - burnIn)*(0.+p_val*0.5))
-        upper = int((self.dataLen - burnIn)*(1.-p_val*0.5))
+        lower = int((len(self.melt) - burnIn)*(0.+p_val*0.5))
+        upper = int((len(self.melt) - burnIn)*(1.-p_val*0.5))
 
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(1, 1, 1)
@@ -251,6 +251,9 @@ class MCMCresult:
                 bins=bins,
                 density=True)
         ax.tick_params(labelsize=32)
+
+        print("mean", elementFunc(data).sort_values()[lower:upper].mean())
+        print("stdev", elementFunc(data).sort_values()[lower:upper].std())
         return ax
 
     def showMeltKde(self, e1, e2, burnIn=0, nbins=100, filterFunc=lambda csv: csv):

@@ -94,6 +94,17 @@
       return this;
     }
 
+    getInternalState() {
+      return {
+        rand: this.rand.getInternalState();
+      }
+    }
+
+    setInternalState(state) {
+      this.rand.setInternalState(state.rand);
+      return this;
+    }
+
     /**
      * 
      * 
@@ -316,6 +327,13 @@
                 })
             }
           })
+      })
+    }
+
+    queryInternalStateOfMCMC() {
+      const self = this;
+      return new Promise((res, rej) => {
+        const
       })
     }
 
