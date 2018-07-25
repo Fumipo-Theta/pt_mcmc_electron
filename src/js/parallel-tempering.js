@@ -96,12 +96,16 @@
 
     getInternalState() {
       return {
-        rand: this.rand.getInternalState();
+        lnPStorage: this.lnPStorage,
+        parameterStorage: this.parameterStorage,
+        rand: this.rand.getInternalState()
       }
     }
 
     setInternalState(state) {
-      this.rand.setInternalState(state.rand);
+      this.lnPStorage = state.lnPStorage,
+        this.parameterStorage = state.parameterStorage,
+        this.rand.setInternalState(state.rand);
       return this;
     }
 
@@ -141,10 +145,10 @@
      * @param {Object} opt
      * @param {String} workerPath
      */
-    startSession(n, opt, workerPath = "../src/js/mcmcWorker.js") {
+    startSession(n, opt, totalIteration = 0, workerPath = "../src/js/mcmcWorker.js") {
       const self = this;
       this.restJobTime = 0;
-      this.totalIteration = 0;
+      this.totalIteration = totalIteration;
       this.iteration = 0;
 
       /**
@@ -153,8 +157,12 @@
       this.deleteChain();
       this.workerNum = n;
       this.mcmcWorkers = take(n).map(_ => new Worker(workerPath))
-      this.parameterStorage = take(n).map(_ => []);
-      this.lnPStorage = take(n).map(_ => []);
+      if (totalIteration === 0) {
+        this.parameterStorage = take(n).map(_ => []);
+        this.lnPStorage = take(n).map(_ => []);
+      }
+      this.mcmcStateStorage = take(n).map(_ => []);
+
       /**
        * calculate inversed temperature by powered function
        */
@@ -171,7 +179,6 @@
           "message",
           function (ev) {
             self.handleMessage(ev.data)
-              .then(self.action.terminate(self))
           },
           false
         )
@@ -268,33 +275,29 @@
     /**
      * Handle message from Webworkers
      * 
-     * @param {String} cmd 
      * @param {Object} msg 
      */
-    handleCommand(cmd, msg) {
+    handleSampled(msg) {
       const self = this;
       return new Promise((res, rej) => {
-        switch (cmd) {
-          case "sampled":
-            self.pending_workerNum--;
-            self.storeSample(msg)
-              .then(self.writeSample.bind(self))
-              .then(self.action.sample(self))
-              .then(_ => res(_))
-            break;
-
-          case "initialize":
-            self.action.initialize(self)(msg)
-              .then(_ => res(_))
-            break;
-
-          default:
-            console.log(msg)
-            res(true);
-            break;
-        }
+        self.pending_workerNum--;
+        self.storeSample(msg)
+          .then(self.writeSample.bind(self))
+          .then(self.action.sample(self))
+          .then(_ => res(_))
       })
     }
+
+    handleInternalState(msg) {
+      const self = this;
+      return new Promise((res, rej) => {
+        self.pending_workerNum--;
+        const { id, state } = msg;
+        self.mcmcStateStorage[id] = state;
+        res();
+      })
+    }
+
 
     /**
 
@@ -306,34 +309,85 @@
       return new Promise((res, rej) => {
         const { cmd, msg } = data;
 
-        self.handleCommand(cmd, msg)
-          .then(_ => {
-            data = null
-            // 全てのMCMCが結果を返したらChianの交換を行う
-            if (self.pending_workerNum <= 0) {
+        switch (cmd) {
+          case "sampled":
+            self.handleSampled(msg)
+              .then(_ => {
+                data = null
+                // 全てのMCMCが結果を返したらChianの交換を行う
+                if (self.pending_workerNum <= 0) {
 
-              self.swapChains()
-                .then(self.action.swap(self))
-                .then(_ => {
-                  // 実行中のMCMC数をリセット
-                  self.pending_workerNum = self.workerNum;
-                  self.restJobTime--;
+                  self.swapChains()
+                    .then(self.action.swap(self))
+                    .then(_ => {
+                      // 実行中のMCMC数をリセット
+                      self.pending_workerNum = self.workerNum;
+                      self.restJobTime--;
 
-                  if (self.restJobTime > 0) {
-                    self.dispatch();
-                  } else {
-                    res("fulfilled")
-                  }
-                })
-            }
-          })
+                      if (self.restJobTime > 0) {
+                        self.dispatch();
+                      } else {
+                        self.queryInternalStateOfMCMC();
+                      }
+                    })
+                }
+              })
+
+            break;
+
+          case "initialize":
+            self.action.initialize(self)(msg)
+              .then(_ => res("initialized"))
+            break;
+
+          case "internalState":
+            self.handleInternalState(msg)
+              .then(_ => {
+                data = null;
+                if (self.pending_workerNum <= 0) {
+                  self.action.terminate(self)()
+                  res("fulfilled");
+                }
+              })
+            break;
+
+          default:
+            console.log(msg)
+            res(true);
+            break;
+        }
+
       })
     }
 
+    /**
+     * Send request of internal state of MCMC to WebWorkers 
+     */
     queryInternalStateOfMCMC() {
       const self = this;
+      self.pending_workerNum = self.workerNum;
       return new Promise((res, rej) => {
-        const
+        self.mcmcWorkers.map(w => {
+          w.postMessage({
+            "cmd": "requestMCMCInternalState",
+            "msg": {}
+          })
+        })
+        res()
+      })
+    }
+
+    restoreInternalStateOfMCMC(state) {
+      const self = this;
+      return new Promise((res, rej) => {
+        self.mcmcWorkers.map((w, i) => {
+          w.postMessage({
+            "cmd": "restoreMCMCInternalState",
+            "msg": {
+              "state": state[i]
+            }
+          })
+        })
       })
     }
 

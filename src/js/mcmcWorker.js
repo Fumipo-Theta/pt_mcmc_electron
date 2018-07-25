@@ -82,10 +82,24 @@ this.addEventListener("message", function (ev) {
       })
       break;
 
+    case "requestMCMCInternalState":
+      self.postMessage({
+        "cmd": "internalState",
+        "msg": {
+          "id": state.id,
+          "state": mcmc.getInternalState()
+        }
+      })
+      break;
+
+    case "restoreMCMCInternalState":
+      mcmc.setInternalState(msg.state);
+      break;
+
     case "close":
       self.postMessage({
         "cmd": "closed",
-        "message": `${state.id} closed`
+        "msg": `${state.id} closed`
       })
       self.close();
       break;

@@ -34,7 +34,8 @@
     "colorMap": [],
     "option": {},
     "option_file": "",
-    "plotInterval": 1
+    "plotInterval": 1,
+    "mcmcInternalState" : []
   }
 
   return state;

@@ -93,7 +93,7 @@
     outputPrefix: document.querySelector("#output_prefix_input"),
     alpha: document.querySelector("#alpha_input"),
     model: document.querySelector("#model_file_name_input"),
-    plotInterval : document.querySelector("#plotInterval_input")
+    plotInterval: document.querySelector("#plotInterval_input")
   }
 
   const dom_show = {
@@ -123,8 +123,77 @@
       const publisher = new Publisher()
       const subscriber = publisher.subscriber();
 
-      subscriber.subscribe("change_data", ({ ev, key, state, label, format }) => {
-        const file = ev.target.files[0];
+      subscriber.subscribe("restart", ({ file, state, ptmcmc }) => {
+        const reader = new FileReader();
+        reader.readAsText(file);
+
+        reader.onload = ev => {
+          const meta = JSON.parse(reader.result);
+
+          [
+            "totalIteration",
+            "workerNum",
+            "alpha",
+            "data_file",
+            "error_file",
+            "data",
+            "error",
+            "model",
+            "acceptedTime",
+            "exchangeTime",
+            "primaryKey",
+            "option_file",
+            "option"
+          ].map(key => {
+            if (!meta.hasOwnProperty(key)) throw new Error("Invaild back up format.");
+            publisher.publish("change_value", {
+              value: meta[key],
+              key: key,
+              state: state
+            })
+          })
+
+          document.querySelector("#model_file_name_input").value = state.model;
+
+          document.querySelector("#data_file_name").innerHTML = state.data_file;
+
+          document.querySelector("#error_file_name").innerHTML = state.error_file;
+          state.mcmcInternalState = meta.mcmcInternalState;
+          ptmcmc.setInternalState(meta.ptmcmcInternalState)
+
+          ptmcmc
+            .startSession(
+              state.workerNum,
+              {
+                "observed": {
+                  "data": state.data,
+                  "error": state.error
+                },
+                "model": state.model,
+                "alpha": state.alpha,
+                "option": state.option
+              },
+              state.totalIteration
+            );
+          ptmcmc.restoreInternalStateOfMCMC(state.mcmcInternalState);
+          state.colorMap = palette("tol-rainbow", state.workerNum)
+          state.totalIteration += parseInt(state.iteration);
+          dom_totalIteration.innerHTML = state.totalIteration;
+
+          ptmcmc.startSampling(
+            state.iteration,
+            state.outputDir + state.outputPrefix
+          )
+
+        }
+
+        reader.onerror = err => {
+          //document.querySelector(label).innerHTML = "Not loaded !"
+        }
+      })
+
+      subscriber.subscribe("change_data", ({ file, key, state, label, format }) => {
+
         const reader = new FileReader();
         reader.readAsText(file);
 
@@ -154,6 +223,7 @@
 
 
       subscriber.subscribe("change_value", ({ value, key, state }) => {
+        if (dom_input.hasOwnProperty(key)) dom_input[key].value = value;
         state[key] = value
       })
 
@@ -195,10 +265,37 @@
       /**
        * Add event listener to DOM
        */
-      document.querySelector("#start_button")
-        .addEventListener("click", ev => {
-          publisher.publish("execute", state);
-        }, false)
+
+      document.ondragover = document.ondrop = function (e) {
+        e.preventDefault(); // イベントの伝搬を止めて、アプリケーションのHTMLとファイルが差し替わらないようにする
+        return false;
+      };
+
+
+      const start_button = document.querySelector("#start_button")
+      start_button.addEventListener("click", ev => {
+        publisher.publish("execute", state);
+      }, false)
+
+
+      start_button.ondragover = ev => {
+        start_button.value = "Restart"
+        return false
+      }
+      start_button.ondragleave = ev => {
+        return false
+      }
+
+      start_button.ondrop = ev => {
+        ev.preventDefault();
+        publisher.publish("restart", {
+          file: ev.dataTransfer.files[0],
+          state: state,
+          ptmcmc: ptmcmc
+        })
+        return false
+      }
+
 
       dom_input.iteration
         .addEventListener("change", _ => {
@@ -270,59 +367,61 @@
           })
         })
 
-      dom_input.plotInterval 
-      .addEventListener("change",_=>{
-        publisher.publish("change_value",{
-          value:dom_input.plotInterval.value,
-          key:"plotInterval",
-          state : state
-        })
+      dom_input.plotInterval
+        .addEventListener("change", _ => {
+          publisher.publish("change_value", {
+            value: dom_input.plotInterval.value,
+            key: "plotInterval",
+            state: state
+          })
+        });
+
+
+      [["option", "json"], ["data", "csv"], ["error", "csv"]].map(([key, format]) => {
+        const dom_list = document.querySelector(`#${key}_file_list`)
+        dom_list.ondragover = function () {
+          dom_list.classList.add("drag-over")
+          return false;
+        };
+        dom_list.ondragleave = function () {
+          dom_list.classList.remove("drag-over")
+          return false;
+        };
+        dom_list.ondrop =
+          ev => {
+            ev.preventDefault();
+            dom_list.classList.remove("drag-over")
+            publisher.publish("change_data", {
+              file: ev.dataTransfer.files[0], key: key, state: state,
+              label: `#${key}_file_name`,
+              format: format
+            })
+
+            publisher.publish("change_value", {
+              value: true,
+              key: "isDirty",
+              state: state
+            })
+            return false
+          }
+
+        const dom_label = document.querySelector(`#${key}_file_select`);
+        dom_label.addEventListener("change", ev => {
+          publisher.publish("change_data", {
+            file: ev.target.files[0], key: key, state: state,
+            label: `#${key}_file_name`,
+            format: format
+          })
+
+          publisher.publish("change_value", {
+            value: true,
+            key: "isDirty",
+            state: state
+          })
+        }, false)
       })
 
-      document.querySelector("#option_file_select")
-        .addEventListener("change", ev => {
-          publisher.publish("change_data", {
-            ev: ev, key: "option", state: state,
-            label: "#option_file_name",
-            format: "json"
-          })
 
-          publisher.publish("change_value", {
-            value: true,
-            key: "isDirty",
-            state: state
-          })
-        }, false)
-
-      document.querySelector("#data_file_select")
-        .addEventListener("change", ev => {
-          publisher.publish("change_data", {
-            ev: ev, key: "data", state: state,
-            label: "#data_file_name",
-            format: "csv"
-          })
-
-          publisher.publish("change_value", {
-            value: true,
-            key: "isDirty",
-            state: state
-          })
-        }, false)
-
-      document.querySelector("#error_file_select")
-        .addEventListener("change", ev => {
-          publisher.publish("change_data", {
-            ev: ev, key: "error", state: state,
-            label: "#error_file_name",
-            format: "csv"
-          })
-
-          publisher.publish("change_value", {
-            value: true,
-            key: "isDirty",
-            state: state
-          })
-        }, false)
 
       /**
        * modal windowへの表示

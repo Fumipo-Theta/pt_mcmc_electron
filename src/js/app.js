@@ -103,7 +103,7 @@
       return msg
     })
     .setAction("terminate", (self, msg) => {
-      console.log("fullfilled")
+      console.log("fulfilled")
       const meta = ((s) => {
         const list = [
           "ptSeed",
@@ -113,6 +113,8 @@
           "alpha",
           "data_file",
           "error_file",
+          "data",
+          "error",
           "model",
           "acceptedTime",
           "exchangeTime",
@@ -126,6 +128,8 @@
         filtered.map(([k, v]) => {
           res[k] = v
         })
+        res.mcmcInternalState = self.mcmcStateStorage;
+        res.ptmcmcInternalState = self.getInternalState();
         return res
       })(state)
       if (typeof require === 'undefined') {
