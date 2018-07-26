@@ -193,8 +193,8 @@
       this.mcmcWorkers.map((w, i) => {
         w.addEventListener(
           "message",
-          function (ev) {
-            self.handleMessage(ev.data)
+          async function (ev) {
+            await self.handleMessage(ev.data);
           },
           false
         )
@@ -254,7 +254,7 @@
         self.restJobTime = iteration;
         self.action["start"](self)()
           .then(_ => self.dispatch())
-          .then(_ => res(true))
+          .then(res)
       })
     }
 
@@ -263,20 +263,15 @@
      * send message to all WebWorkers to sample 1 time
      */
     async dispatch() {
-      const self = this;
-
       while (this.pauseSampling) {
         await wait(1000);
       }
-
 
       const workers = this.mcmcWorkers;
       this.totalIteration++;
       this.iteration++;
 
       return new Promise((res, rej) => {
-
-
         workers.map(w => {
           w.postMessage({ "cmd": "sample", "msg": {} })
         });
@@ -309,6 +304,7 @@
         self.pending_workerNum--;
         self.storeSample(msg)
           .then(self.writeSample.bind(self))
+          .then(self.action.sample(self))
           .then(res)
       })
     }
@@ -337,28 +333,26 @@
         switch (cmd) {
           case "sampled":
             self.handleSampled(msg)
-              .then(self.action.sample(self))
-              .then(_ => {
+              .then(async msg => {
+
                 data = null
                 // 全てのMCMCが結果を返したらChianの交換を行う
                 if (self.pending_workerNum <= 0) {
-
-                  self.swapChains()
+                  await self.swapChains()
                     .then(self.action.swap(self))
-                    .then(_ => {
+                    .then(async _ => {
                       // 実行中のMCMC数をリセット
                       self.pending_workerNum = self.workerNum;
                       self.restJobTime--;
 
                       if (self.restJobTime > 0) {
-                        self.dispatch();
+                        await self.dispatch();
                       } else {
-                        self.queryInternalStateOfMCMC();
+                        await self.queryInternalStateOfMCMC();
                       }
                     })
                 }
-              })
-
+              }).then(res)
             break;
 
           case "initialize":

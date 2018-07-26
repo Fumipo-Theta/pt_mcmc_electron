@@ -205,6 +205,7 @@
       plot_parameter.layout,
       plotOption
     )
+
     return true;
   }
 
