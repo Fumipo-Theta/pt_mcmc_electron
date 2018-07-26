@@ -164,13 +164,9 @@
   }
 
 
-
-
-
-
   const plotAfterSample = async (ptmcmc, msg, state) => {
     // 0番目(最も低温のMCMCのモデルのみプロットする)
-    if (msg.id !== 0) return false;
+    if (msg.id !== parseInt(state.idPlotMCMC)) return false;
     const plot_model = getDataAndModel_plotly(
       state.data,
       state.error,
@@ -179,7 +175,7 @@
     )
 
     const plot_parameter = getParameter_plotly(
-      ptmcmc.parameterStorage[0]
+      ptmcmc.parameterStorage[msg.id]
     )
 
     const plotMethod = (ptmcmc.totalIteration === 1 || ptmcmc.totalIteration === state.totalIteration)

@@ -93,7 +93,8 @@
     outputPrefix: document.querySelector("#output_prefix_input"),
     alpha: document.querySelector("#alpha_input"),
     model: document.querySelector("#model_file_name_input"),
-    plotInterval: document.querySelector("#plotInterval_input")
+    plotInterval: document.querySelector("#plotInterval_input"),
+    idPlotMCMC: document.querySelector("#idPlotMCMC_input")
   }
 
   const dom_show = {
@@ -143,7 +144,8 @@
             "exchangeTime",
             "primaryKey",
             "option_file",
-            "option"
+            "option",
+            "idPlotMCMC"
           ].map(key => {
             if (!meta.hasOwnProperty(key)) throw new Error("Invaild back up format.");
             publisher.publish("change_value", {
@@ -423,6 +425,15 @@
           publisher.publish("change_value", {
             value: dom_input.plotInterval.value,
             key: "plotInterval",
+            state: state
+          })
+        });
+
+      dom_input.idPlotMCMC
+        .addEventListener("change", _ => {
+          publisher.publish("change_value", {
+            value: dom_input.idPlotMCMC.value,
+            key: "idPlotMCMC",
             state: state
           })
         });
