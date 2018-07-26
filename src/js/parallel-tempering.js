@@ -301,7 +301,7 @@
     handleSampled(msg) {
       const self = this;
       return new Promise((res, rej) => {
-        self.pending_workerNum--;
+        //self.pending_workerNum--;
         self.storeSample(msg)
           .then(self.writeSample.bind(self))
           .then(self.action.sample(self))
@@ -312,7 +312,6 @@
     handleInternalState(msg) {
       const self = this;
       return new Promise((res, rej) => {
-        self.pending_workerNum--;
         const { id, state } = msg;
         self.mcmcStateStorage[id] = state;
         res();
@@ -333,25 +332,25 @@
         switch (cmd) {
           case "sampled":
             self.handleSampled(msg)
-              .then(async msg => {
-
-                data = null
+              .then(msg => {
+                self.pending_workerNum--;
                 // 全てのMCMCが結果を返したらChianの交換を行う
                 if (self.pending_workerNum <= 0) {
-                  await self.swapChains()
+                  self.swapChains(msg)
                     .then(self.action.swap(self))
-                    .then(async _ => {
+                    .then(_ => {
                       // 実行中のMCMC数をリセット
                       self.pending_workerNum = self.workerNum;
                       self.restJobTime--;
 
                       if (self.restJobTime > 0) {
-                        await self.dispatch();
+                        self.dispatch();
                       } else {
-                        await self.queryInternalStateOfMCMC();
+                        self.queryInternalStateOfMCMC();
                       }
                     })
                 }
+                data = null;
               }).then(res)
             break;
 
@@ -362,10 +361,11 @@
 
           case "internalState":
             self.handleInternalState(msg)
-              .then(_ => {
+              .then(async _ => {
                 data = null;
+                self.pending_workerNum--;
                 if (self.pending_workerNum <= 0) {
-                  self.action.terminate(self)()
+                  await self.action.terminate(self)()
                   res("fulfilled");
                 }
               })
@@ -375,8 +375,9 @@
             console.log(msg)
             res(true);
             break;
-        }
 
+        }
+        data = null;
       })
     }
 
@@ -500,7 +501,7 @@
      * 実装では各MCMCの逆温度は固定で, パラメータと事後確率を交換するようになっている.
      * totalIterationの偶奇で逆温度を交換するペアを変えている.
      */
-    swapChains() {
+    swapChains(msg) {
       const self = this;
       return new Promise((res, rej) => {
 
@@ -538,7 +539,7 @@
             self.exchangeTime[i]++;
           }
         })
-        res(true);
+        res(msg);
       })
     }
 
