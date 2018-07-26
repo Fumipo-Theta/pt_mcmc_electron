@@ -92,11 +92,12 @@
     return msg
   })
     .setAction("sample", async (self, msg) => {
+      await plotAfterSample(self, msg, state);
       updateAcceptedRate(self, state, msg)
       return msg
     })
     .setAction("swap", async (self, msg) => {
-      await plotAfterSample(self, msg, state);
+      
       await plotAfterSwap(self, msg, state)
       updateExchangeRate(self, state, msg)
       return msg
