@@ -35,7 +35,8 @@
     "option": {},
     "option_file": "",
     "plotInterval": 1,
-    "mcmcInternalState" : []
+    "mcmcInternalState": [],
+    "mcmcState": "idle"
   }
 
   return state;

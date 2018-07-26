@@ -237,6 +237,10 @@ th{
 	overflow:auto;
 }
 
+.inner_card.column{
+  flex-direction: column;
+}
+
 .inner_card.centering{
   justify-content: center;
 }

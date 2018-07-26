@@ -85,24 +85,24 @@
     : require("../src/js/parallel-tempering.js");
 
   const ptmcmc = new PTMCMC(state.ptSeed);
-  ptmcmc.setAction("initialize", (self, msg) => {
+  ptmcmc.setAction("initialize", async (self, msg) => {
     console.log(self)
     console.log(msg);
     state.seed[msg.id] = msg.seed;
     return msg
   })
-    .setAction("sample", (self, msg) => {
+    .setAction("sample", async (self, msg) => {
       //console.log(msg);
       updateAcceptedRate(self, state, msg)
-      plotAfterSample(self, msg, state);
+      await plotAfterSample(self, msg, state);
       return msg
     })
-    .setAction("swap", (self, msg) => {
-      plotAfterSwap(self, msg, state)
+    .setAction("swap", async (self, msg) => {
+      await plotAfterSwap(self, msg, state)
       updateExchangeRate(self, state, msg)
       return msg
     })
-    .setAction("terminate", (self, msg) => {
+    .setAction("terminate", async (self, msg) => {
       console.log("fulfilled")
       const meta = ((s) => {
         const list = [
@@ -131,12 +131,18 @@
         res.mcmcInternalState = self.mcmcStateStorage;
         res.ptmcmcInternalState = self.getInternalState();
         return res
-      })(state)
+      })(state);
+
+
       if (typeof require === 'undefined') {
         self.downloadCsv(meta);
       } else {
         fs.writeFileSync(state.outputDir + "meta-" + [...self.timestamp].pop() + ".json", JSON.stringify(meta, null, 2), "utf8")
       }
+
+      state.mcmcState = "idle";
+      document.querySelector("#start_button").value = "Start"
+
       return msg
     })
 

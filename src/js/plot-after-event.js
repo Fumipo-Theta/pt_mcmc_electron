@@ -168,7 +168,7 @@
 
 
 
-  const plotAfterSample = (ptmcmc, msg, state) => {
+  const plotAfterSample = async (ptmcmc, msg, state) => {
     // 0番目(最も低温のMCMCのモデルのみプロットする)
     if (msg.id !== 0) return false;
     const plot_model = getDataAndModel_plotly(
@@ -192,14 +192,14 @@
       ? { staticPlot: false }
       : { staticPlot: true };
     // ここでグラフを更新する
-    plotMethod(
+    await plotMethod(
       "wrapper_data_and_model",
       plot_model.trace,
       plot_model.layout,
       plotOption
     )
 
-    plotMethod(
+    await plotMethod(
       "param_wrapper",
       plot_parameter.trace,
       plot_parameter.layout,

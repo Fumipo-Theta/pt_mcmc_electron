@@ -34,6 +34,11 @@
     }
     : require("fs.promises")
 
+  const wait = ms => new Promise((res, rej) => {
+    setTimeout(_ => res(), ms)
+  })
+
+
   /*
 	if (typeof Worker === "undefined" && typeof require !== 'undefined'){
 		var {Worker} = require("webworker-threads");
@@ -84,6 +89,8 @@
       this.outputPrefix = "";
       this.timestamp = [];
 
+      this.pauseSampling = false;
+
       this.action = {
         "start": self => _ => new Promise(r => r()),
         "initialize": self => msg => new Promise(r => r()),
@@ -100,7 +107,7 @@
         lnPStorage: this.lnPStorage,
         parameterStorage: this.parameterStorage,
         rand: this.rand.getInternalState(),
-        exchangeTime : this.exchangeTime
+        exchangeTime: this.exchangeTime
       }
     }
 
@@ -255,11 +262,21 @@
     /**
      * send message to all WebWorkers to sample 1 time
      */
-    dispatch() {
+    async dispatch() {
+      const self = this;
+
+      while (this.pauseSampling) {
+        await wait(1000);
+      }
+
+
       const workers = this.mcmcWorkers;
       this.totalIteration++;
       this.iteration++;
+
       return new Promise((res, rej) => {
+
+
         workers.map(w => {
           w.postMessage({ "cmd": "sample", "msg": {} })
         });
@@ -292,8 +309,7 @@
         self.pending_workerNum--;
         self.storeSample(msg)
           .then(self.writeSample.bind(self))
-          .then(self.action.sample(self))
-          .then(_ => res(_))
+          .then(res)
       })
     }
 
@@ -321,6 +337,7 @@
         switch (cmd) {
           case "sampled":
             self.handleSampled(msg)
+              .then(self.action.sample(self))
               .then(_ => {
                 data = null
                 // 全てのMCMCが結果を返したらChianの交換を行う
@@ -401,11 +418,11 @@
     }
 
 
-    setAction(type, f) {
-      this.action[type] = self => opt => new Promise((res, rej) => {
-        const result = f(self, opt)
-        res(result)
-      })
+    setAction(type, asyncFuncion) {
+      this.action[type] = self => async opt => {
+        const result = await asyncFuncion(self, opt);
+        return result
+      }
       return this;
     }
 

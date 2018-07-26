@@ -159,7 +159,7 @@
 
           document.querySelector("#error_file_name").innerHTML = state.error_file;
           state.mcmcInternalState = meta.mcmcInternalState;
-          
+
 
           ptmcmc
             .reStartSession(
@@ -179,6 +179,8 @@
           state.colorMap = palette("tol-rainbow", state.workerNum)
           state.totalIteration += parseInt(state.iteration);
           dom_totalIteration.innerHTML = state.totalIteration;
+
+          state.mcmcState = "running";
 
           ptmcmc.startSampling(
             state.iteration,
@@ -254,13 +256,23 @@
         state.totalIteration += parseInt(state.iteration);
         dom_totalIteration.innerHTML = state.totalIteration;
 
+        state.mcmcState = "running";
+
         ptmcmc.startSampling(
           state.iteration,
           state.outputDir + state.outputPrefix
         )
       })
 
+      subscriber.subscribe("pause", ({ ptmcmc, state }) => {
+        state.mcmcState = "paused";
+        ptmcmc.pauseSampling = true;
+      })
 
+      subscriber.subscribe("continue", ({ ptmcmc, state }) => {
+        state.mcmcState = "running";
+        ptmcmc.pauseSampling = false;
+      })
 
       /**
        * Add event listener to DOM
@@ -274,12 +286,39 @@
 
       const start_button = document.querySelector("#start_button")
       start_button.addEventListener("click", ev => {
-        publisher.publish("execute", state);
+
+        switch (state.mcmcState) {
+          case "running":
+            publisher.publish("pause", { ptmcmc, state });
+            start_button.value = "Continue";
+            break;
+          case "idle":
+            publisher.publish("execute", state);
+            start_button.value = "Pause";
+            break;
+          case "paused":
+            publisher.publish("continue", { ptmcmc, state });
+            start_button.value = "Pause";
+            break;
+          default:
+            break;
+        }
       }, false)
 
 
       start_button.ondragover = ev => {
-        start_button.value = "Restart"
+
+        switch (state.mcmcState) {
+          case "running":
+            break;
+          case "idle":
+            start_button.value = "Restart"
+            break;
+          case "paused":
+            break;
+          default:
+            break;
+        }
         return false
       }
       start_button.ondragleave = ev => {
@@ -288,12 +327,23 @@
 
       start_button.ondrop = ev => {
         ev.preventDefault();
-        publisher.publish("restart", {
-          file: ev.dataTransfer.files[0],
-          state: state,
-          ptmcmc: ptmcmc
-        })
-        start_button.value = "Start"
+
+        switch (state.mcmcState) {
+          case "running":
+            break;
+          case "idle":
+            publisher.publish("restart", {
+              file: ev.dataTransfer.files[0],
+              state: state,
+              ptmcmc: ptmcmc
+            })
+            start_button.value = "Pause"
+            break;
+          case "paused":
+            break;
+          default:
+            break;
+        }
         return false
       }
 
