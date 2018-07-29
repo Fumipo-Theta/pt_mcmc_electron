@@ -192,8 +192,7 @@
             "exchangeTime",
             "primaryKey",
             "option_file",
-            "option",
-            "idPlotMCMC"
+            "option"
           ].map(key => {
             if (!meta.hasOwnProperty(key)) throw new Error("Invaild back up format.");
             publisher.publish("change_value", {
