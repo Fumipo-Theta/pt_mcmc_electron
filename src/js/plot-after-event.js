@@ -163,19 +163,39 @@
     return { trace, layout };
   }
 
-
-  const plotAfterSample = async (ptmcmc, msg, state) => {
-    // 0番目(最も低温のMCMCのモデルのみプロットする)
-    if (msg.id !== parseInt(state.idPlotMCMC)) return false;
+  const plotModeled = async (ptmcmc, { id, modeled }, state) => {
+    if (id !== parseInt(state.idPlotMCMC)) return false;
     const plot_model = getDataAndModel_plotly(
       state.data,
       state.error,
-      msg.modeled,
+      modeled,
       state.primaryKey
     )
+    const plotMethod = (ptmcmc.totalIteration === 1 || ptmcmc.totalIteration === state.totalIteration)
+      ? Plotly.newPlot
+      : (ptmcmc.totalIteration % state.plotInterval === 0)
+        ? Plotly.react
+        : (_) => null;
+
+    const plotOption = (ptmcmc.totalIteration === state.totalIteration)
+      ? { staticPlot: false }
+      : { staticPlot: true };
+
+    // ここでグラフを更新する
+    await plotMethod(
+      "wrapper_data_and_model",
+      plot_model.trace,
+      plot_model.layout,
+      plotOption
+    )
+  }
+
+  const plotAfterSample = async (ptmcmc, { id, modeled }, state) => {
+
+    if (parseInt(id) !== parseInt(state.idPlotMCMC)) return false;
 
     const plot_parameter = getParameter_plotly(
-      ptmcmc.parameterStorage[msg.id]
+      ptmcmc.parameterStorage[id]
     )
 
     const plotMethod = (ptmcmc.totalIteration === 1 || ptmcmc.totalIteration === state.totalIteration)
@@ -187,13 +207,7 @@
     const plotOption = (ptmcmc.totalIteration === state.totalIteration)
       ? { staticPlot: false }
       : { staticPlot: true };
-    // ここでグラフを更新する
-    await plotMethod(
-      "wrapper_data_and_model",
-      plot_model.trace,
-      plot_model.layout,
-      plotOption
-    )
+
 
     await plotMethod(
       "param_wrapper",
@@ -300,6 +314,7 @@
   }
 
   return {
+    plotModeled,
     plotAfterSample,
     plotAfterSwap
   };

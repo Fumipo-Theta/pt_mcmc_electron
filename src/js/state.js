@@ -36,7 +36,7 @@
     "option_file": "",
     "plotInterval": 1,
     "mcmcInternalState": [],
-    "mcmcState": "idle",
+    "mcmcState": "initial",
     "idPlotMCMC": 0
   }
 

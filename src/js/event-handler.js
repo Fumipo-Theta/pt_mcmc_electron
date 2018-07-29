@@ -8,10 +8,11 @@
       root.PubSub,
       root.TextParser,
       root.palette,
-      root.ModalMedia
+      root.ModalMedia,
+      root.plotAfterEvent
     );
   }
-}(this, function (_PubSub, _tf, _palette, _ModalMedia) {
+}(this, function (_PubSub, _tf, _palette, _ModalMedia, _plotAfterEvent) {
 
   const { Publisher, Subscriber } = (typeof require === 'undefined' && (typeof _PubSub === 'object' || typeof _PubSub === 'function'))
     ? _PubSub
@@ -28,6 +29,11 @@
   const ModalMedia = (typeof require === 'undefined' && (typeof _ModalMedia === 'object' || typeof _ModalMedia === 'function'))
     ? _ModalMedia
     : require("./modal-media");
+
+  const {plotAfterSample} = (typeof require === 'undefined' && (typeof _plotAfterEvent === 'object' || typeof _plotAfterEvent === 'function'))
+      ? _plotAfterEvent
+      : require("./plot-after-event.js");
+
 
   const fetchFunc = (url, option) => (typeof require !== 'undefined')
     ? (fs => {
@@ -105,7 +111,30 @@
     error: document.querySelector("#error_file_name")
   }
 
+  const dom_currentIteration = document.querySelector("#presentCount");
+  const dom_acceptedTable = document.querySelector("#accepted_table table");
+  const dom_exchangeTable = document.querySelector("#exchange_table table");
 
+
+  const updateTable = (dom_table, tbodyArray, thead = [], tbodyHead = []) => {
+    const dom_thead = dom_table.querySelector("thead");
+    const dom_tbody = dom_table.querySelector("tbody");
+
+    if (thead.length > 0) {
+      dom_thead.innerHTML = `<thead><th></th>${thead.map(v => `<th>${v.replace(/_/g, " ")}</th>`).reduce((a, b) => a + b, "")}</thead>`
+    }
+
+    dom_tbody.innerHTML = `<tbody>
+    ${tbodyArray.map((rowAsArray, i) => {
+        const th = (tbodyHead[i] === undefined) ? "" : tbodyHead[i]
+        return `<tr>
+        <th>${th}</th>
+        ${rowAsArray.map(v => `<td>${v}</td>`).reduce((a, b) => a + b, "")}
+      </tr>`
+      }).reduce((a, b) => a + "\n" + b, "")}
+    </tbody>`
+
+  }
 
   const initialize = state => {
     Object.entries(dom_input).map(([k, dom]) => {
@@ -113,7 +142,26 @@
     })
   }
 
-  return (ptmcmc, state) => {
+  const updateAcceptedRate = (ptmcmc, state, id) => {
+    if (parseInt(id) === parseInt(state.idPlotMCMC)) updateTable(
+      dom_acceptedTable,
+      state.acceptedTime[id].map(paramSet => Object.values(paramSet)),
+      Object.keys(state.acceptedTime[id][0]),
+      state.acceptedTime[id].map((_, i) => "parameter set " + i)
+    )
+  }
+
+  const updateExchangeRate = (ptmcmc, state) => {
+    dom_currentIteration.innerHTML = ptmcmc.totalIteration;
+
+    updateTable(
+      dom_exchangeTable,
+      [state.exchangeTime],
+      Array(state.workerNum - 1).fill(0).map((_, i) => `${i}-${i + 1}`)
+    )
+  }
+
+  const eventHandler = (ptmcmc, state) => {
 
     initialize(state);
 
@@ -294,6 +342,10 @@
             publisher.publish("pause", { ptmcmc, state });
             start_button.value = "Continue";
             break;
+          case "initial":
+            publisher.publish("execute", state);
+            start_button.value = "Pause";
+            break;
           case "idle":
             publisher.publish("execute", state);
             start_button.value = "Pause";
@@ -312,6 +364,9 @@
 
         switch (state.mcmcState) {
           case "running":
+            break;
+          case "initial":
+            start_button.value = "Restart"
             break;
           case "idle":
             start_button.value = "Restart"
@@ -430,13 +485,26 @@
         });
 
       dom_input.idPlotMCMC
-        .addEventListener("change", _ => {
+        .addEventListener("change", ev => {
+          ev.preventDefault();
           publisher.publish("change_value", {
             value: dom_input.idPlotMCMC.value,
             key: "idPlotMCMC",
             state: state
           })
-        });
+
+          if (state.mcmcState === "idle"){
+            updateAcceptedRate(ptmcmc, state, dom_input.idPlotMCMC.value);
+            updateExchangeRate(ptmcmc,state);
+            plotAfterSample(ptmcmc, { id: dom_input.idPlotMCMC.value},state);
+          }
+
+        }, false);
+
+      dom_input.idPlotMCMC
+        .addEventListener("keydown", ev => {
+
+        }, false);
 
 
       [["option", "json"], ["data", "csv"], ["error", "csv"]].map(([key, format]) => {
@@ -535,5 +603,11 @@
         false
       )
     }
+  }
+
+  return {
+    updateAcceptedRate,
+    updateExchangeRate,
+    eventHandler
   }
 }))

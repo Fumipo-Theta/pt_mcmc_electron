@@ -99,6 +99,12 @@ th{
 	font-family: "Arial";
 }
 
+#plot-settings{
+  position: sticky;
+  top:0;
+  z-index:500;
+}
+
 
 
 /* page navigation */
@@ -111,7 +117,7 @@ th{
 		width: 100vw;
 		height: 60px;
 		position: fixed;
-	
+    z-index:900;
 		margin: 0;
 	
 		top: 0;
@@ -139,9 +145,8 @@ th{
 	min-height: 10px;
 	
 	margin: 20px auto 0px auto;
-	overflow: hidden;
 	border-radius: 5px;
-	overflow:auto;
+	/*overflow:auto;*/
 	}
 }
 
@@ -152,7 +157,7 @@ th{
 		width: 100px;
 		height: 100vh;
 		position: fixed;
-	
+    z-index:900;
 		margin: 0;
 		padding: 10px;
 	
@@ -182,9 +187,8 @@ th{
 	min-height: 10px;
 	min-width: 1200px;
 	margin: 20px 120px 0px auto;
-	overflow: hidden;
 	border-radius: 5px;
-	overflow:auto;
+	/*overflow:auto;*/
 	}
 }
 
