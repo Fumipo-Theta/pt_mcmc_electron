@@ -54,6 +54,7 @@
     console.log(self)
     console.log(msg);
     state.seed[msg.id] = msg.seed;
+    //console.log(new Date())
     return msg
   })
     .setAction("sample", async (self, msg) => {
