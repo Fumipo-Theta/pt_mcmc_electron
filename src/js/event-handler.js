@@ -30,9 +30,9 @@
     ? _ModalMedia
     : require("./modal-media");
 
-  const {plotAfterSample} = (typeof require === 'undefined' && (typeof _plotAfterEvent === 'object' || typeof _plotAfterEvent === 'function'))
-      ? _plotAfterEvent
-      : require("./plot-after-event.js");
+  const { plotAfterSample } = (typeof require === 'undefined' && (typeof _plotAfterEvent === 'object' || typeof _plotAfterEvent === 'function'))
+    ? _plotAfterEvent
+    : require("./plot-after-event.js");
 
 
   const fetchFunc = (url, option) => (typeof require !== 'undefined')
@@ -46,6 +46,7 @@
       fetch(url)
         .then(response => res(response.text()))
     });
+
 
   const df2table = df => {
     const thead = Object.keys(df);
@@ -73,6 +74,14 @@
 
   /**
    * 
+   */
+  const approxiateProbability = (state) => {
+    if (!(state.hasOwnProperty("data") && state.hasOwnProperty("error"))) return null;
+
+  }
+
+  /**
+   * 
    * Workerからmodelなどをstringifyして受け取ったものをmarkdownのコードブロックとして表示する.
    * data.replace(/\\r\\n/g, "\n").replace(/\\["']/g, "").replace(/"/g, "")は,
    * 余分な改行を削除,
@@ -89,6 +98,7 @@
     document.querySelector("#modal_window")
   )
 
+
   const dom_totalIteration = document.querySelector("#totalCount");
 
   const dom_input = {
@@ -101,6 +111,10 @@
     model: document.querySelector("#model_file_name_input"),
     plotInterval: document.querySelector("#plotInterval_input"),
     idPlotMCMC: document.querySelector("#idPlotMCMC_input")
+  }
+
+  const dom_check = {
+    randomSeed: document.querySelector("#random_seed_flag_input")
   }
 
   const dom_show = {
@@ -139,7 +153,10 @@
   const initialize = state => {
     Object.entries(dom_input).map(([k, dom]) => {
       dom.value = state[k];
-    })
+    });
+    Object.entries(dom_check).map(([k, dom]) => {
+      dom.checked = state[k];
+    });
   }
 
   const updateAcceptedRate = (ptmcmc, state, id) => {
@@ -172,6 +189,9 @@
       const publisher = new Publisher()
       const subscriber = publisher.subscriber();
 
+      /**
+       * 以前のメタファイルが渡されると, WebWorkerとのセッションを開始した直後に乱数生成器の状態を復元する.
+       */
       subscriber.subscribe("restart", ({ file, state, ptmcmc }) => {
         const reader = new FileReader();
         reader.readAsText(file);
@@ -239,7 +259,7 @@
         }
 
         reader.onerror = err => {
-          //document.querySelector(label).innerHTML = "Not loaded !"
+          //$(label).innerHTML = "Not loaded !"
         }
       })
 
@@ -283,6 +303,8 @@
 
         // コントローラーを定義したほうが良さそう
         if (state.isDirty) {
+          if (state.randomSeed) ptmcmc.setSeed();
+
           ptmcmc
             .startSession(
               state.workerNum,
@@ -293,7 +315,8 @@
                 },
                 "model": state.model,
                 "alpha": state.alpha,
-                "option": state.option
+                "option": state.option,
+                "randomSeed": state.randomSeed
               });
           state.seed = [];
           state.totalIteration = 0;
@@ -492,10 +515,10 @@
             state: state
           })
 
-          if (state.mcmcState === "idle"){
+          if (state.mcmcState === "idle") {
             updateAcceptedRate(ptmcmc, state, dom_input.idPlotMCMC.value);
-            updateExchangeRate(ptmcmc,state);
-            plotAfterSample(ptmcmc, { id: dom_input.idPlotMCMC.value},state);
+            updateExchangeRate(ptmcmc, state);
+            plotAfterSample(ptmcmc, { id: dom_input.idPlotMCMC.value }, state);
           }
 
         }, false);
@@ -505,6 +528,21 @@
 
         }, false);
 
+
+      dom_check.randomSeed.addEventListener("change",
+        ev => {
+          publisher.publish("change_value", {
+            value: dom_check.randomSeed.checked,
+            key: "randomSeed",
+            state: state
+          });
+          publisher.publish("change_value", {
+            value: true,
+            key: "isDirty",
+            state: state
+          });
+        }, false
+      );
 
       [["option", "json"], ["data", "csv"], ["error", "csv"]].map(([key, format]) => {
         const dom_list = document.querySelector(`#${key}_file_list`)

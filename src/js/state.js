@@ -17,6 +17,7 @@
     "isDirty": true,
     "ptSeed": 200,
     "seed": [],
+    "randomSeed": true,
     "totalIteration": 0,
     "iteration": 200,
     "workerNum": 4,

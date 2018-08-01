@@ -68,10 +68,7 @@
      * @param {Number} seed 
      */
     constructor(seed) {
-      this.rand = new mt((seed === undefined)
-        ? new Date().getTime()
-        : seed
-      )
+      this.setSeed(seed);
       this.totalIteration = 0; // start from createChain() 
       this.iteration = 0; // start from each execute()
       this.restJobTime = 0;
@@ -99,6 +96,13 @@
         "terminate": self => _ => new Promise(r => r())
       }
       return this;
+    }
+
+    setSeed(seed) {
+      this.rand = new mt((seed === undefined)
+        ? new Date().getTime()
+        : seed
+      );
     }
 
     getInternalState() {
@@ -140,7 +144,9 @@
       return this;
     }
 
-
+    createSeed(seedLen, workerNum) {
+      return [...Array(workerNum)].map((_, i) => [...Array(seedLen)].map(_ => this.rand.nextInt()));
+    }
 
     /**
      * ptmcmc.startSession(
@@ -209,7 +215,8 @@
               "error": opt.observed.error
             },
             "model": opt.model,
-            "option": opt.option
+            "option": opt.option,
+            "seed": opt.randomSeed ? this.createSeed(5, n) : undefined
           }
         })
       })
