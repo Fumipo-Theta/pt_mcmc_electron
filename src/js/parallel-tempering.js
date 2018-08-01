@@ -279,7 +279,7 @@
       this.iteration++;
 
       return new Promise((res, rej) => {
-        workers.map(w => {
+        workers.forEach(w => {
           w.postMessage({ "cmd": "sample", "msg": {} })
         });
         res(true);
@@ -289,7 +289,7 @@
     getAcceptedInfo() {
       const workers = this.mcmcWorkers;
       return new Promise((res, rej) => {
-        workers.map((w) => {
+        workers.forEach((w) => {
           w.postMessage({ "cmd": "info", msg: {} })
         })
         res(true)
@@ -395,7 +395,7 @@
       const self = this;
       self.pending_workerNum = self.workerNum;
       return new Promise((res, rej) => {
-        self.mcmcWorkers.map(w => {
+        self.mcmcWorkers.forEach(w => {
           w.postMessage({
             "cmd": "requestMCMCInternalState",
             "msg": {}
@@ -408,7 +408,7 @@
     restoreInternalStateOfMCMC(state) {
       const self = this;
       return new Promise((res, rej) => {
-        self.mcmcWorkers.map((w, i) => {
+        self.mcmcWorkers.forEach((w, i) => {
           w.postMessage({
             "cmd": "restoreMCMCInternalState",
             "msg": {
@@ -445,8 +445,8 @@
        */
       if (this.iteration === 1) {
         const arr = ["iteration"]
-        parameter.map((p, i) => {
-          Object.keys(p).map(k => {
+        parameter.forEach((p, i) => {
+          Object.keys(p).forEach(k => {
             arr.push(`${k}${i}`);
           })
         })
@@ -478,17 +478,17 @@
 
         // 最初だけparameterStorageを初期化
         if (i === 1) {
-          parameter.map((p, j) => {
+          parameter.forEach((p, j) => {
             self.parameterStorage[id][j] = {};
-            Object.keys(p).map(k => {
+            Object.keys(p).forEach(k => {
               self.parameterStorage[id][j][k] = []
             })
           })
         }
 
         // サンプリングされたパラメータセットを保存
-        PTMCMC.extractLastParameter(parameter).map((p, j) => {
-          Object.entries(p).map(([k, v]) => {
+        PTMCMC.extractLastParameter(parameter).forEach((p, j) => {
+          Object.entries(p).forEach(([k, v]) => {
             self.parameterStorage[id][j][k].push(v)
             if (i > 100) self.parameterStorage[id][j][k].shift()
           })
@@ -521,7 +521,7 @@
           parseInt((fin - ini) * 0.5),
           ini,
           2
-        ).map(i => {
+        ).forEach(i => {
           /**
            * 遷移確率がアンダーフローしないように対数で計算
            */
@@ -556,7 +556,7 @@
      */
     deleteChain() {
       if (this.mcmcWorkers.length > 0) {
-        this.mcmcWorkers.map(w => {
+        this.mcmcWorkers.forEach(w => {
           w.postMessage({
             "cmd": "close",
             "msg": {}
@@ -596,7 +596,7 @@
     static extractLastParameter(parameters) {
       return parameters.map(p => {
         let obj = {}
-        Object.entries(p).map(kv => {
+        Object.entries(p).forEach(kv => {
           obj[kv[0]] = kv[1][kv[1].length - 1]
         })
         return obj
@@ -605,8 +605,8 @@
 
     static parameterToCsv(i, parameter, lnP) {
       const arr = [i];
-      parameter.map(p => {
-        Object.values(p).map(v => {
+      parameter.forEach(p => {
+        Object.values(p).forEach(v => {
           arr.push(v[0])
         })
       })

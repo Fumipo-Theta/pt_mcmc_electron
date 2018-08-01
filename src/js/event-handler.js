@@ -151,10 +151,10 @@
   }
 
   const initialize = state => {
-    Object.entries(dom_input).map(([k, dom]) => {
+    Object.entries(dom_input).forEach(([k, dom]) => {
       dom.value = state[k];
     });
-    Object.entries(dom_check).map(([k, dom]) => {
+    Object.entries(dom_check).forEach(([k, dom]) => {
       dom.checked = state[k];
     });
   }
@@ -213,7 +213,7 @@
             "primaryKey",
             "option_file",
             "option"
-          ].map(key => {
+          ].forEach(key => {
             if (!meta.hasOwnProperty(key)) throw new Error("Invaild back up format.");
             publisher.publish("change_value", {
               value: meta[key],
@@ -544,7 +544,7 @@
         }, false
       );
 
-      [["option", "json"], ["data", "csv"], ["error", "csv"]].map(([key, format]) => {
+      [["option", "json"], ["data", "csv"], ["error", "csv"]].forEach(([key, format]) => {
         const dom_list = document.querySelector(`#${key}_file_list`)
         dom_list.ondragover = function () {
           dom_list.classList.add("drag-over")
