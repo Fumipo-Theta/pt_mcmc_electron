@@ -6,7 +6,7 @@
   } else {
     root.eventHandler = factory(
       root.PubSub,
-      root.TextParser,
+      root.textFile,
       root.palette,
       root.ModalMedia,
       root.plotAfterEvent
