@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import json
 import numpy as np
@@ -9,7 +10,7 @@ import matplotlib.cm as cm
 from matplotlib.colors import LinearSegmentedColormap
 
 
-def generate_cmap(colors):
+def _generate_cmap(colors):
     """自分で定義したカラーマップを返す"""
     values = range(len(colors))
 
@@ -20,19 +21,19 @@ def generate_cmap(colors):
     return LinearSegmentedColormap.from_list('custom_cmap', color_list)
 
 
-def fileList(dir, func):
+def _fileList(dir, func):
     return list(filter(func, os.listdir(dir)))
 
 
 class MCMCresult:
     def __init__(self):
-        self.acceptedColor = generate_cmap(["#bb0000", "#888888", "#0000bb"])
+        self.acceptedColor = _generate_cmap(["#bb0000", "#888888", "#0000bb"])
 
     def readMelt(self, stageNumber, rootDir="./"):
         self.melt = pd.concat(
             list(
                 map(pd.read_csv,
-                    fileList(rootDir, lambda file: file.find(
+                    _fileList(rootDir, lambda file: file.find(
                         "melt_"+str(stageNumber)) >= 0)
                     )
             ),
@@ -41,7 +42,7 @@ class MCMCresult:
 
     def readMeta(self, rootDir="./"):
         metaFile = open(
-            fileList(rootDir, lambda file: file.find("meta-") >= 0).pop())
+            _fileList(rootDir, lambda file: file.find("meta-") >= 0).pop())
         self.meta = json.load(metaFile)
         # print(self.meta["acceptedTime"][0])
 
@@ -49,7 +50,7 @@ class MCMCresult:
         self.csvData = pd.concat(
             list(
                 map(pd.read_csv,
-                    fileList(rootDir, lambda file: file.find(
+                    _fileList(rootDir, lambda file: file.find(
                         "sample-"+str(Num_MCMC)) >= 0)
                     )
             ),
