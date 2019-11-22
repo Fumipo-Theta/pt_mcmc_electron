@@ -633,7 +633,7 @@
                     dummyLink.href = "data:application/zip;base64," + base64;
                     document.body.appendChild(dummyLink)
                     dummyLink.click()
-                    document.removeChild(dummyLink)
+                    document.body.removeChild(dummyLink)
                     dummyLink = null;
                 });
         }
