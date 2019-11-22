@@ -127,6 +127,10 @@ console.table(Object.entries(summarizedParameters[0]))
 ```
 
 ```javascript
+console.log(spread)
+```
+
+```javascript
 Plotly([
     {
         y : funcTools.zipWith((x,y)=>1-x-y)
