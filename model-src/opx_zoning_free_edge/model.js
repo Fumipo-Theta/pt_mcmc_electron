@@ -15,7 +15,7 @@
  */
 
 const MagmaSystem = require('../../../phase/src/magma-system');
-const { mapCrystalGrowthParam: mapLiquidLineParam, mapLatticeDiffusionParam, mapMagmaMixingParam: mapMagmaMixingLineParam } = require("./map_model_parameter")
+const { mapLiquidLineParam, mapLatticeDiffusionParam, mapMagmaMixingLineParam } = require("./map_model_parameter")
 const { melt, olivine, orthopyroxene, spinel, meltThermometer } = require("./def_phases")
 
 const initMagmaSystem = require("./initialize_magma_system")
@@ -43,7 +43,7 @@ const fromLast = (i, len) => len - i - 1
 const repeatedArray = n => (array) => Array(n)
     .fill(0)
     .map(_ => [...array])
-    .reduce((a, b) => [...a, ...b]);
+    .flat();
 
 /**
  * Construct magma system and model on generating chemical zoning of a target crystal.
@@ -77,12 +77,12 @@ const genMagmaModel = (option) => {
     const magma = new MagmaSystem()
 
     const repeat = repeatedArray(option.radius.length - 1);
-    const traceGoingBack = repeat([magmaMixingLine, liquidLine])
+    const traceGoingBackLiquidLine = repeat([magmaMixingLine, liquidLine])
 
     magma.setThermodynamicHandler(getMagmaPT)
         .setAction([
             initMagmaSystem,
-            ...traceGoingBack,
+            ...traceGoingBackLiquidLine,
             ...repeat([evalDiffusionAfterEachShellGrows])
         ])
         .setFinalAction(mapProfileToPosition)
