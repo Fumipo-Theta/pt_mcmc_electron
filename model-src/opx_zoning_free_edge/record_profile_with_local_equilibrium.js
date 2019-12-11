@@ -18,7 +18,7 @@ const checkSame = (target, eps) => x => Math.abs(x - target) < eps;
  * @param {*} targetMgN
  * @param {*} stoichiometry
  * @param {*} dF
- * @param {*} isRecord
+ * @param {*} toBeRecord
  *
  * moveCrystalBoundary(
  *  magma,
@@ -29,8 +29,13 @@ const checkSame = (target, eps) => x => Math.abs(x - target) < eps;
  *  true
  * )
  */
-const recordLocalEquilibriumCondition = (
-    magma, observedPhaseName, targetMgN, stoichiometry, dF, isRecord
+const recordProfileWithLocalEquilibrium = (
+    magma,
+    observedPhaseName,
+    targetMgN,
+    stoichiometry,
+    dF,
+    toBeRecord
 ) => {
     const melt = magma.phase.melt;
 
@@ -67,7 +72,9 @@ const recordLocalEquilibriumCondition = (
         solids.map(entry => {
             entry[1].equilibrate('melt', T, P)
         })
-        if (isRecord) {
+
+        if (toBeRecord) {
+            // Record initial condition
             solids.map(([name, phase]) => {
                 phase.pushProfile(stoichiometry[name] * F, T, P, pathName)
             })
@@ -111,7 +118,7 @@ const recordLocalEquilibriumCondition = (
             limit++
             if (limit > 100) break;
         }
-        //=========================
+
 
         // Update total fraction not exceeding final condition
         F += dF;
@@ -120,7 +127,7 @@ const recordLocalEquilibriumCondition = (
     }
 
     // Record final state
-    if (isRecord) {
+    if (toBeRecord) {
         solids.map(entry => {
             let name = entry[0], phase = entry[1];
             phase.pushProfile(stoichiometry[name] * F, T, P, pathName);
@@ -131,4 +138,4 @@ const recordLocalEquilibriumCondition = (
 
 }
 
-module.exports = recordLocalEquilibriumCondition
+module.exports = recordProfileWithLocalEquilibrium

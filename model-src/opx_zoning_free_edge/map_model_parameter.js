@@ -22,7 +22,7 @@
  *
  * @return {Object}
  */
-const mapCrystalGrowthParam = (mcmc_param, sphere_idx, glbl_opt) => {
+const mapLiquidLineParam = (mcmc_param, sphere_idx, glbl_opt) => {
     return {
         'dF': glbl_opt.dF,
         'targetPhase': glbl_opt.targetPhase,
@@ -38,7 +38,7 @@ const mapCrystalGrowthParam = (mcmc_param, sphere_idx, glbl_opt) => {
     }
 }
 
-const mapCrystalRimGrowthParam = (mcmc_param, sphere_idx, glbl_opt) => {
+const mapLiquidLineForCrystalRimParam = (mcmc_param, sphere_idx, glbl_opt) => {
     return {
         'dF': glbl_opt.dF,
         'targetPhase': glbl_opt.targetPhase,
@@ -53,7 +53,7 @@ const mapCrystalRimGrowthParam = (mcmc_param, sphere_idx, glbl_opt) => {
     }
 }
 
-const mapMagmaMixingParam = (mcmc_param, sphere_idx, glbl_opt) => {
+const mapMagmaMixingLineParam = (mcmc_param, sphere_idx, glbl_opt) => {
     return {
         'dF': glbl_opt.dF,
         'targetPhase': glbl_opt.targetPhase,
@@ -79,8 +79,8 @@ const mapLatticeDiffusionParam = (mcmc_param, sphere_idx, glbl_opt) => {
 }
 
 module.exports = {
-    mapCrystalGrowthParam,
-    mapCrystalRimGrowthParam,
+    mapLiquidLineParam,
+    mapLiquidLineForCrystalRimParam,
     mapLatticeDiffusionParam,
-    mapMagmaMixingParam
+    mapMagmaMixingLineParam
 }

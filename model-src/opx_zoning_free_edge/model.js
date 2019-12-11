@@ -15,13 +15,13 @@
  */
 
 const MagmaSystem = require('../../../phase/src/magma-system');
-const { mapCrystalGrowthParam, mapLatticeDiffusionParam, mapMagmaMixingParam } = require("./map_model_parameter")
+const { mapCrystalGrowthParam: mapLiquidLineParam, mapLatticeDiffusionParam, mapMagmaMixingParam: mapMagmaMixingLineParam } = require("./map_model_parameter")
 const { melt, olivine, orthopyroxene, spinel, meltThermometer } = require("./def_phases")
 
 const initMagmaSystem = require("./initialize_magma_system")
-const simulateMagmaMixing = require("./approximate_magma_mixing")
-const simulateCrystalGrowth = require("./grow_crystals")
-const evalDiffusionAfterGrowth = require("./eval_diffusion")
+const magmaMixingLine = require("./approximate_magma_mixing_line")
+const liquidLine = require("./along_liquid_line")
+const evalDiffusionAfterEachShellGrows = require("./eval_diffusion")
 const mapProfileToPosition = require("./map_diffused_profile_to_position")
 
 
@@ -74,31 +74,30 @@ const genMagmaModel = (option) => {
      *  .diffuse()
      *  ...
      */
-    const repeat = repeatedArray(option.radius.length - 1);
-
-    const magmaProcessesSequence = [
-        ...repeat([simulateMagmaMixing, simulateCrystalGrowth]),
-        ...repeat([evalDiffusionAfterGrowth])
-    ]
-
     const magma = new MagmaSystem()
+
+    const repeat = repeatedArray(option.radius.length - 1);
+    const traceGoingBack = repeat([magmaMixingLine, liquidLine])
+
     magma.setThermodynamicHandler(getMagmaPT)
         .setAction([
-            initMagmaSystem, ...magmaProcessesSequence
+            initMagmaSystem,
+            ...traceGoingBack,
+            ...repeat([evalDiffusionAfterEachShellGrows])
         ])
-        .setFinalAction(
-            mapProfileToPosition
-        )
+        .setFinalAction(mapProfileToPosition)
+
 
     const model = (mcmc_parameters, data, isMCMC = true) => {
-        // copy input parameters
+        // Reverse input MCMC parameters to go back
+        //   from the rim to center
         const parameters = [...mcmc_parameters].reverse();
         const paramNum = parameters.length
 
         const restoreLiquidLineParams = parameters.map(
             (p, i) => [
-                mapMagmaMixingParam(p, fromLast(i, paramNum), option),
-                mapCrystalGrowthParam(p, fromLast(i, paramNum), option)
+                mapMagmaMixingLineParam(p, fromLast(i, paramNum), option),
+                mapLiquidLineParam(p, fromLast(i, paramNum), option)
             ]
         ).flat();
 
@@ -126,20 +125,20 @@ const genMagmaModel = (option) => {
             'finalMelt': option.finalMelt,
         }
 
-        const getProfileOpt = {
+        const getZoningOpt = {
             'targetPhase': option.targetPhase,
             'dataPos': data.x
         }
 
-        const modeledProfile = magma.execAction([
+        const modeledZoning = magma.execAction([
             initializeMagmaOpt,
             ...restoreLiquidLineParams,
             ...execLatticeDiffusionParams,
-            getProfileOpt
+            getZoningOpt
         ])
 
         return (isMCMC)
-            ? modeledProfile
+            ? modeledZoning
             : magma
 
     }

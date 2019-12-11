@@ -1,4 +1,4 @@
-const recordCondition = require("./record_local_equilibrium")
+const recordProfile = require("./record_profile_with_local_equilibrium")
 
 /**
      * Approximated simulation of magma mixing.
@@ -13,7 +13,7 @@ const recordCondition = require("./record_local_equilibrium")
      * @param {*} ope
      * @param {*} result
      */
-const approximateMagmaMixing = (magma, ope, result) => {
+const approximateMagmaMixingLine = (magma, ope, result) => {
     const {
         dF,
         targetPhase,
@@ -26,7 +26,7 @@ const approximateMagmaMixing = (magma, ope, result) => {
         barometer: _ => P
     })
 
-    const pathName = recordCondition(
+    const pathName = recordProfile(
         magma,
         targetPhase,
         MgN_beforeMixing,
@@ -42,4 +42,4 @@ const approximateMagmaMixing = (magma, ope, result) => {
     return {}
 }
 
-module.exports = approximateMagmaMixing
+module.exports = approximateMagmaMixingLine

@@ -1,4 +1,4 @@
-const recordCondition = require("./record_local_equilibrium")
+const recordProfile = require("./record_profile_with_local_equilibrium")
 
 /**
  * Crystals grow in the host melt which is already set composition.
@@ -16,7 +16,7 @@ const recordCondition = require("./record_local_equilibrium")
  *
  * Crystal grow until Mg# of a given phase reach a specific value.
  */
-const growCrystals = (magma, ope, result) => {
+const alongLiquidLine = (magma, ope, result) => {
     const {
         dF,
         targetPhase,
@@ -30,7 +30,7 @@ const growCrystals = (magma, ope, result) => {
     })
 
     // 結晶成長を伴うメルト組成変化
-    const pathName = recordCondition(
+    const pathName = recordProfile(
         magma,
         targetPhase,
         MgN_beforeCrystallization,
@@ -51,4 +51,4 @@ const growCrystals = (magma, ope, result) => {
     return {}
 }
 
-module.exports = growCrystals
+module.exports = alongLiquidLine
