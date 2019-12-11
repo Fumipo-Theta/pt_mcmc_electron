@@ -18,11 +18,7 @@ const genMagmaModel = require('./model')
  *  dF : Number,
  *  radius : [Number],
  *  finalMelt : {
- *    composition : {
- *      SiO2 : Number,
- *      ...
- *      H2O : Number
- *    },
+ *    composition : {String : Number},
  *    Fe2Ratio : Number
  *  },
  *  P : [Number],
@@ -92,9 +88,15 @@ module.exports = option => {
         }
 
     /**
-     * 結晶化前のMg#は結晶化後のMg#, すなわちマグマ混合前のMg#より大きい.
-     * 最外部のセクションの結晶化前のMg#は結晶のリムのMg#より大きい.
+     * Mg# of the opx before fractional crystallization
+     *   must be larger than that after crystallization,
+     *   which is assumed to be Mg# before magma mixing.
      *
+     * Sum of soichiometry of crystallization of opx and
+     *   spinel must be less equal to 1.
+     * Sum of fraction of approximating magma mixing
+     *  of opx and spinel is assumed to be less equal
+     *  to 1.
      */
     const constrain = {
         MgN_beforeCrystallization: (cand, i, parameter) => cand > parameter[i].MgN_beforeMixing,
