@@ -15,9 +15,10 @@ jupyter:
 # Visualize estimated parameters
 
 ```javascript
-var {
+const {
     ls,
     read,
+    concat_df,
     fetchData,
     getSummarizedParameters,
     groupEachStage,
@@ -27,9 +28,9 @@ var {
     sampleMeltComposition
 } = require("./show-magma-model")
 
-var funcTools = require("../../jslib/funcTools")
-var fs = require("fs")
-var spread = funcTools.spread;
+const funcTools = require("../../jslib/funcTools")
+const fs = require("fs")
+const spread = funcTools.spread;
 
 var fontMaker = (fontSize) => {
     return {
@@ -127,10 +128,6 @@ console.table(Object.entries(summarizedParameters[0]))
 ```
 
 ```javascript
-console.log(spread)
-```
-
-```javascript
 Plotly([
     {
         y : funcTools.zipWith((x,y)=>1-x-y)
@@ -221,6 +218,10 @@ spread(
 ```javascript
 var modeled = model(summarizedParameters,data)
 var ndProfiles = magma.diffusionProfiles.orthopyroxene;
+```
+
+```javascript
+
 
 var ndFe_Mg = ndProfiles.Fe_Mg.notDiffusedProfile.get()
 
@@ -297,6 +298,10 @@ spread(
     axis("x","Radius"),
     axis("y","Fe/Mg")
 ))
+```
+
+```javascript
+ndProfiles
 ```
 
 ```javascript
@@ -450,12 +455,77 @@ spread(
 )
 ```
 
+## Write samled melt compositions
+
 ```javascript
 
 var parametersPath = ls(resultPath)(path=>file=>fs.statSync(path + file).isFile() && /^sample.*\.csv$/.test(file))
-var df_parameters = read.csv(parametersPath.directory+parametersPath.files[1])
+var df_parameters = concat_df(
+    parametersPath.files.filter(file => /^sample-0.*\.csv$/.test(file)).map(file=>{
+        return read.csv(parametersPath.directory+file)
+    })
+)
 
-sampleMeltComposition(df_parameters,0,model,data,"z:/")
+
+```
+
+```javascript
+sampleMeltComposition(df_parameters,model,data,"z:/")
+```
+
+## Write out profiles
+
+```javascript
+const path = require("path")
+
+```
+
+```javascript
+var writeJSON=(obj, dir, name) => {
+    fs.writeFileSync(path.join(dir,name), JSON.stringify(obj, null, 2))
+}
+
+var join_opx_profile=(diffusion_profile_root)=>{
+    const o = {diffused:{}, no_diffused:{}}
+    o.diffused={
+        Fe_Mg : diffusion_profile_root.Fe_Mg.profile,
+        Cr2O3 : diffusion_profile_root.Cr2O3.profile
+    }
+    o.no_diffused = {
+        Fe_Mg : diffusion_profile_root.Fe_Mg.notDiffusedProfile,
+        Cr2O3 : diffusion_profile_root.Cr2O3.notDiffusedProfile
+    }
+    return o
+}
+```
+
+```javascript
+var profileDir = path.join(resultPath,"/computed/profiles/")
+
+if (!fs.existsSync(profileDir)){
+    fs.mkdirSync(path.join(resultPath,"/computed/"))
+    fs.mkdirSync(path.join(resultPath,"/computed/profiles/"))
+}
+
+writeJSON(
+    join_opx_profile(magma.diffusionProfiles.orthopyroxene),
+    profileDir,
+    "opx_profile.json"
+)
+```
+
+```javascript
+writeJSON(
+    magma.custom.mixingLineStack,
+    profileDir,
+    "magma_mixing_lines.json"
+)
+
+writeJSON(
+    magma.custom.differentiationLineStack,
+    profileDir,
+    "liquid_lines.json"
+)
 ```
 
 ```javascript

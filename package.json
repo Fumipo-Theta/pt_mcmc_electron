@@ -1,34 +1,40 @@
 {
-  "name": "ptmcmc",
-  "version": "1.0.0",
-  "description": "",
-  "main": "next.js",
-  "directories": {
-    "doc": "doc"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "asciidoctor.js": "^1.5.7-rc.1",
-    "d3": "^5.5.0",
-    "fs-extra": "^6.0.1",
-    "fs.promises": "^0.1.2",
-    "hyperapp": "^1.2.8",
-    "ijavascript-plotly": "0.0.1",
-    "jszip": "^3.1.5",
-    "marked": "^0.4.0",
-    "node-fetch": "^2.2.0",
-    "nodemailer": "^4.6.7",
-    "plotly.js": "^1.39.2",
-    "webworker-threads": "^0.7.16"
-  },
-  "devDependencies": {
-    "electron": "^2.0.5",
-    "node-gyp": "^3.7.0"
-  }
+    "name": "ptmcmc",
+    "version": "1.0.0",
+    "description": "",
+    "main": "next.js",
+    "directories": {
+        "doc": "doc"
+    },
+    "scripts": {
+        "build": "npx webpack",
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "start": "node server.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "asciidoctor.js": "^1.5.7-rc.1",
+        "d3": "^5.5.0",
+        "fs-extra": "^6.0.1",
+        "fs.promises": "^0.1.2",
+        "hyperapp": "^1.2.8",
+        "ijavascript-plotly": "0.0.1",
+        "jszip": "^3.1.5",
+        "marked": "^0.4.0",
+        "node-fetch": "^2.2.0",
+        "nodemailer": "^4.6.7",
+        "plotly.js": "^1.39.2",
+        "webworker-threads": "^0.7.16"
+    },
+    "devDependencies": {
+        "@babel/core": "^7.7.5",
+        "@babel/preset-env": "^7.7.6",
+        "babel-loader": "^8.0.6",
+        "electron": "^2.0.5",
+        "node-gyp": "^3.7.0",
+        "webpack": "^4.41.2",
+        "webpack-cli": "^3.3.10"
+    }
 }

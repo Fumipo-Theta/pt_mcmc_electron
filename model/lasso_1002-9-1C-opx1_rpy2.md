@@ -121,7 +121,7 @@ Fe_Mg = plot_zoning_segment(
 Figure().add_subplot(
     Cr2O3,
     Fe_Mg
-).show(size=style["plot_size"], margin=(0,0))
+).show(size=(4, 3), dpi=144, margin=(0,0))
 ```
 
 ```python
