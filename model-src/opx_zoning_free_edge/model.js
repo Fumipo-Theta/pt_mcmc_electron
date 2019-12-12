@@ -118,8 +118,10 @@ const genMagmaModel = (option) => {
         */
 
         const initializeMagmaOpt = {
-            'phases': [melt, olivine, orthopyroxene, spinel],
-            'thermometer': meltThermometer,
+            'systemComponents': {
+                'phase': [melt, olivine, orthopyroxene, spinel],
+                'thermometer': meltThermometer
+            },
             'targetPhase': option.targetPhase,
             'D': option.D0,
             'finalMelt': option.finalMelt,
