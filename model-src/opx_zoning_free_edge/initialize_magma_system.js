@@ -18,7 +18,7 @@ const initialize = (magma, ope) => {
     const { phases, thermometer, targetPhase, D, finalMelt } = ope;
 
     magma.setThermodynamicAgent({
-        phases: phases,
+        phase: phases,
         thermometer: thermometer
     });
     magma.phase.melt.setComposition(finalMelt.composition)
