@@ -38,10 +38,11 @@
         return res
     }
 
-    const fetchData = (rp, dp) => {
+    const fetchData = (rp, dp, NumMCMC = 0) => {
+        const path = require("path")
         const metaFiles = ls(rp)(path => file => fs.statSync(path + file).isFile() && /^meta.*\.json$/.test(file))
         const sampleFiles = ls(rp)(path => file => fs.statSync(path + file).isFile() && /.*\.csv$/.test(file))
-        const summaryFiles = ls(rp)(path => file => file === "summary.csv");
+        const summaryFiles = ls(path.join(rp, "/computed/"))(path => file => file === `summary_MCMC-${NumMCMC}.csv`);
         //console.log(metaFiles)
         //console.log(sampleFiles)
 
