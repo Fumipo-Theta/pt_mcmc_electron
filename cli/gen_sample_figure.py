@@ -5,6 +5,7 @@ import json
 from cli.lib.common import ResultResolver, AnalysisResolver
 from cli.lib.mcmc_result import MCMCResult
 from cli.lib.plot_sample_transition import plot as plot_transition
+from cli.lib.plot_sample_hist import plot as plot_hist
 
 
 def _help():
@@ -39,6 +40,12 @@ def main(argv):
     fig, axes = plot_transition(mcmc, log.get("burn_in"))
     plt.savefig(
         analyzed_dir.resolve_image_path("sample_transition", {"n": num_MC})
+    )
+
+    fig, axes = plot_hist(mcmc, log.get("burn_in"),
+                          log.get("bins"), log.get("p_val"))
+    plt.savefig(
+        analyzed_dir.resolve_image_path("sample_hist", {"n": num_MC})
     )
 
 
