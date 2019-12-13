@@ -4,7 +4,6 @@
 node_modules/
 result/
 __pycache__
-/results/*/sample*.csv
-/results/*/meta*.json
-!/results/*/*.md
+results/
+analyzed/**/image
 computed
