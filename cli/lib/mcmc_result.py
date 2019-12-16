@@ -38,11 +38,38 @@ class MCMCResult:
     def get_sampled(self)->pd.DataFrame:
         return self.sampled
 
-    def get_sample_summary(self, burn_in: int, bins: int, p_val=0):
-        data: pd.DataFrame = self.sampled[burn_in:]
+    def auto_bins(self):
+        """
+        Bins number as 4 times of (max-min) / max_delta.
+        """
+        update_condition = self.meta["option"]["updateCondition"]
+        params = self.get_parameter_group()
+
+        bins = {}
+
+        for param in params:
+            _max = update_condition[param]["max"]
+            _min = update_condition[param]["min"]
+            _range = _max - _min
+            num_bins = int(_range / update_condition[param]["val"]) * 4
+            diff = _range/num_bins
+            bins[param] = [_min + diff * i for i in range(num_bins+1)]
+
+        return bins
+
+    def get_sample_summary(self, burn_in: int, p_val=0, bins=None):
+        lnP: pd.DataFrame = self.sampled[burn_in:][["lnP"]]
+        data: pd.DataFrame = self.sampled[burn_in:].drop(
+            ["iteration", "lnP"], axis=1)
+
+        if bins is None:
+            _bins = self.auto_bins()
+        else:
+            _bins = bins
+
         print(f"Write summary by")
         print(f"burn-in: {burn_in}")
-        print(f"bins for mode: {bins}")
+        print(f"bins for mode: {_bins}")
         print(f"p value for mode: {p_val}")
         print(
             f"Data length: {len(self.sampled)} - {burn_in}(burn-in) = {len(data)}")
@@ -50,7 +77,7 @@ class MCMCResult:
         call_args = {
             "timestamp": str(datetime.datetime.now()),
             "burn_in": burn_in,
-            "bins": bins,
+            "bins": _bins,
             "p_val": p_val
         }
 
@@ -61,14 +88,17 @@ class MCMCResult:
         upper = int(len(data)*(1.-p_val*0.5))
 
         for col in data.columns:
+
+            param_group = col[0:-1]
+
             hist = np.histogram(
                 data[col].sort_values()[lower:upper],
-                bins=bins
+                bins=_bins.get(param_group)
             )
             mode.append((hist[1][np.argmax(hist[0])] +
                          hist[1][np.argmax(hist[0])+1])*0.5)
 
-        max_P = data[data["lnP"] == np.max(data["lnP"])].values[0]
+        max_P = data[lnP.lnP == np.max(lnP.lnP)].values[0]
 
         res = pd.DataFrame({
             "parameter": data.columns,

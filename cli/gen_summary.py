@@ -9,7 +9,7 @@ def _help():
     print("""
     Usage
 
-    python gen_summary [subdirectory] [Number of MC] [burn-in] [bins] [p-val]
+    python gen_summary [subdirectory] [Number of MC] [burn-in] [p-val] [bins]
 
     [subdirectory] is directory name in results/ for analysis.
     [Number of MC] is the number of Markov Chain to be analyzed.
@@ -20,11 +20,11 @@ def _parse_arg(argv):
     if len(argv) < 2:
         print(f"At least 2 args are requird.")
     elif len(argv) is 2:
-        return (*argv, 0, 10, 0)
+        return (*argv, 0, 0, None)
     elif len(argv) is 3:
-        return (*argv, 10, 0)
+        return (*argv, 0, None)
     elif len(argv) is 4:
-        return (*argv, 0)
+        return (*argv, None)
     elif len(argv) is 5:
         return argv
     else:
@@ -36,7 +36,7 @@ def main(argv):
         _help()
         return
 
-    (subdir, num_MC, burn_in, bins, p_val) = _parse_arg(argv)
+    (subdir, num_MC, burn_in, p_val, bins) = _parse_arg(argv)
     result_dir = ResultResolver(subdir)
     analyzed_dir = AnalysisResolver(subdir)
 
@@ -45,7 +45,7 @@ def main(argv):
     mcmc = MCMCResult(result_dir)
     mcmc.read_samples(num_MC)
     summary, args = mcmc.get_sample_summary(
-        int(burn_in), int(bins), float(p_val))
+        int(burn_in),  float(p_val), int(bins) if bins is not None else None)
 
     summary.to_csv(summary_name)
 
