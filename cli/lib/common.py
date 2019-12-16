@@ -103,3 +103,10 @@ class AnalysisResolver:
 def invalid_result_directory(path: ResultResolver):
     print(
         f"The result directory {path.resolve()} does not exists.")
+
+
+def classify_plot_style(style):
+    fig_style = style.get("fig_style", {})
+    axes_style = style.get("axes_style", {})
+    plot_style = style.get("plot_style", {})
+    return (fig_style, axes_style, plot_style)
