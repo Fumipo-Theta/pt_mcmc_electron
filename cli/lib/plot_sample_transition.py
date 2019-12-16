@@ -12,6 +12,10 @@ def plot(mcmc: MCMCResult, burn_in: int, style={}, label_map={}, lim_map={}):
 
     figure = Figure()
 
+    transition_line = plot_action.line(color="black")
+    fill_burn_in_stage = plot_action.vband(
+        xpos=[[0, burn_in]], alpha=0.3, color="gray")
+
     for row, param in enumerate(params):
         for i in range(n_set):
             subplot = Subplot(axes_style).add(
@@ -21,9 +25,8 @@ def plot(mcmc: MCMCResult, burn_in: int, style={}, label_map={}, lim_map={}):
                 ylabel=f"{label_map.get(param, param)} {i+1}",
                 ylim=lim_map.get(param, [None, None]),
                 plot=[
-                    plot_action.line(color="black"),
-                    plot_action.vband(
-                        xpos=[[0, burn_in]], alpha=0.3, color="gray")
+                    transition_line,
+                    fill_burn_in_stage
                 ]
             )
             figure.add_subplot(subplot)
