@@ -1,4 +1,5 @@
 const genMagmaModel = require('./model')
+const sampleMeltComposition = require("./sample_melt_composition")
 
 /**
  * option : {
@@ -115,6 +116,6 @@ module.exports = option => {
         updateCondition,
         constrain,
         mode,
-        magma
+        magma, sampleMeltComposition
     };
 }
