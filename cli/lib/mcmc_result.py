@@ -40,7 +40,7 @@ class MCMCResult:
 
     def auto_bins(self):
         """
-        Bins number as 4 times of (max-min) / max_delta.
+        Bins number as 4 * int((max-min) / max_delta).
         """
         update_condition = self.meta["option"]["updateCondition"]
         params = self.get_parameter_group()

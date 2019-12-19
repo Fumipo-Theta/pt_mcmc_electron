@@ -16,6 +16,7 @@
     "license": "ISC",
     "dependencies": {
         "asciidoctor.js": "^1.5.7-rc.1",
+        "commander": "^4.0.1",
         "d3": "^5.5.0",
         "fs-extra": "^6.0.1",
         "fs.promises": "^0.1.2",
@@ -26,6 +27,7 @@
         "node-fetch": "^2.2.0",
         "nodemailer": "^4.6.7",
         "plotly.js": "^1.39.2",
+        "shelljs": "^0.8.3",
         "webworker-threads": "^0.7.16"
     },
     "devDependencies": {

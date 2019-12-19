@@ -9,10 +9,13 @@ def _help():
     print("""
     Usage
 
-    python gen_summary [subdirectory] [Number of MC] [burn-in] [p-val] [bins]
+    python gen_summary [sub directory] [Number of MC] (burn-in=0) (p-val=0) (bins=None)
 
-    [subdirectory] is directory name in results/ for analysis.
+    [sub directory] is directory name in results/ for analysis.
     [Number of MC] is the number of Markov Chain to be analyzed.
+    [burn-in] is the number to which sampled parameters are ignored in summarizing.
+    [p-val] is the value for range of confidential.
+    [bins] is the number of histogram.
     """)
 
 
@@ -32,11 +35,16 @@ def _parse_arg(argv):
 
 
 def main(argv):
+    """
+    Record summary of the sampled parameters to analyzed data directory.
+    Log of summarizing is also written out.
+    """
     if "-h" in argv:
         _help()
         return
 
     (subdir, num_MC, burn_in, p_val, bins) = _parse_arg(argv)
+
     result_dir = ResultResolver(subdir)
     analyzed_dir = AnalysisResolver(subdir)
 

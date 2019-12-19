@@ -73,16 +73,19 @@
 
     const getSummarizedParameters = (df, by, initial_parameters) => {
         const ps = [...initial_parameters];
-        const splited = df.parameter.map((k, i) => {
-            let parameter = k.slice(0, k.length - 1)
-            let num = k.slice(k.length - 1)
-            return [parameter, num]
+        const param_and_stage = df.parameter.map((param_name) => {
+            /*
+                Split parameter group name and stage number
+
+                "param_of_something10"
+                -> "param_of_something", "10"
+            */
+            const [_, param, stage, ...__] = param_name.match(/^(.*\D)(\d+)$/);
+            return [param, stage]
         });
 
-        splited.map(([parameter, num], i) => {
-            if (0 < i && i < splited.length - 1) {
-                ps[num][parameter] = df[by][i]
-            }
+        param_and_stage.map(([parameter, stage], i) => {
+            ps[stage][parameter] = df[by][i]
         })
         return ps
     }

@@ -16,13 +16,13 @@ def summary_file_name(Num_MC):
     return f"summary_MC-{Num_MC}.csv"
 
 
-def summary_args_name(Num_MC):
+def summary_log_name(Num_MC):
     return f"summary_MC-{Num_MC}_log.json"
 
 
 class PathResolver:
-    def __init__(self, result_dir: str, subdir: str):
-        self.path = Path(result_dir) / Path(subdir)
+    def __init__(self, root_dir: str, subdir: str):
+        self.path = Path(root_dir) / Path(subdir)
 
     def is_dir(self) -> bool:
         return self.path.is_dir()
@@ -88,7 +88,7 @@ class AnalysisResolver:
     def resolve_summary_paths(self, Num_MC) -> tuple:
         return (
             self.resolve() / Path(summary_file_name(Num_MC)),
-            self.resolve() / Path(summary_args_name(Num_MC))
+            self.resolve() / Path(summary_log_name(Num_MC))
         )
 
     def resolve_image_path(self, imtype: str, ctx={}):

@@ -14,11 +14,10 @@ def _help():
     print("""
     Usage
 
-    python gen_sample_figure [subdirectory] [Number of MC] [plot setting path]
+    python gen_sample_figure [sub directory] [Number of MC]
 
-    [subdirectory] is directory name in results/ for analysis.
+    [sub directory] is directory name in results/ for analysis.
     [Number of MC] is the number of Markov Chain to be analyzed.
-    [plot setting path] is the path to json file defining plot style.
 
     You must execute gen_summary command because this require
       an information of burn-in, bins, and p-value in summarizing.
@@ -78,14 +77,14 @@ def main(argv):
     with open(log_path) as f:
         log = json.load(f)
 
-    fig, axes = plot_transition(mcmc, log.get(
-        "burn_in"), graph_style, label_map, lim_map)
+    fig, axes = plot_transition(
+        mcmc, log["burn_in"], graph_style, label_map, lim_map)
     plt.savefig(
         analyzed_dir.resolve_image_path("sample_transition", {"n": num_MC})
     )
 
-    fig, axes = plot_hist(mcmc, log.get("burn_in"),
-                          log.get("p_val"), log.get("bins"), graph_style, label_map, lim_map)
+    fig, axes = plot_hist(mcmc, log["burn_in"],
+                          log["p_val"], log["bins"], graph_style, label_map, lim_map)
     plt.savefig(
         analyzed_dir.resolve_image_path("sample_hist", {"n": num_MC})
     )
