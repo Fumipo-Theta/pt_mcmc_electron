@@ -31,9 +31,7 @@ program
         )
 
         const df_parameters = concat_df(
-            samples.map(file => {
-                return read.csv(parametersPath.directory + file)
-            })
+            samples.map(read.csv)
         )
 
         sampleMeltComposition(

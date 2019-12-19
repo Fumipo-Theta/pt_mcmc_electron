@@ -226,7 +226,7 @@
                 if (i === 0) fs.writeFileSync(path(stage), Object.keys(melt).reduce(reduceToCsv) + ",lnP\n")
                 fs.appendFileSync(path(stage), Object.values(melt).reduce(reduceToCsv) + "," + df.lnP[i] + "\n")
             }
-            console.log(`Stage ${stage}/${stageNum} fulfilled.`)
+            console.log(`Stage ${stage}/${stageLength - 1} fulfilled.`)
 
         }
     }

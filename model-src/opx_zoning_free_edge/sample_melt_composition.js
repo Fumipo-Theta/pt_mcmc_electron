@@ -73,7 +73,7 @@ const sampleMeltComposition = (df, model, data, directory, num_mc, fs) => {
             fs.appendFileSync(ini_path(stage), Object.values(ini_melt).reduce(reduceToCsv) + "," + df.lnP[i] + "\n")
             fs.appendFileSync(fin_path(stage), Object.values(fin_melt).reduce(reduceToCsv) + "," + df.lnP[i] + "\n")
         }
-        console.log(`Stage ${stage}/${stageNum} fulfilled.`)
+        console.log(`Stage ${stage + 1}/${stageLength} fulfilled.`)
 
     }
 }
