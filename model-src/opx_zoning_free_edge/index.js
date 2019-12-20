@@ -1,5 +1,7 @@
 const genMagmaModel = require('./model')
 const sampleMeltComposition = require("./sample_melt_composition")
+const integrateLiquidLine = require("./integrate_liquid_line")
+const getChemicalZoning = require("./get_chemical_zoning")
 
 /**
  * option : {
@@ -116,6 +118,9 @@ module.exports = option => {
         updateCondition,
         constrain,
         mode,
-        magma, sampleMeltComposition
+        magma,
+        sampleMeltComposition,
+        integrateLiquidLine,
+        getChemicalZoning
     };
 }
