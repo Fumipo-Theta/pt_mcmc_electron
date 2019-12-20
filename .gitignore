@@ -6,4 +6,5 @@ result/
 __pycache__
 results/
 analyzed/**/image
+analyzed/**/melt
 computed
