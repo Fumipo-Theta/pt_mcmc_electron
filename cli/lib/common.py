@@ -1,4 +1,6 @@
 import os
+import re
+import json
 from pathlib import Path
 
 ANALYSIS_DIR = "./analyzed"
@@ -6,18 +8,34 @@ RESULT_DIR = "./results"
 
 
 def mkdir(path: Path):
-    print(path)
     if path.exists():
+        print(f"{path} exists.")
         return
     path.mkdir()
 
 
-def summary_file_name(Num_MC):
-    return f"summary_MC-{Num_MC}.csv"
+def summary_file_name(num_mc):
+    return f"summary_MC-{num_mc}.csv"
 
 
-def summary_log_name(Num_MC):
-    return f"summary_MC-{Num_MC}_log.json"
+def summary_log_name(num_mc):
+    return f"summary_MC-{num_mc}_log.json"
+
+
+def liquid_line_name(num_mc):
+    return f"liquid_line_MC-{num_mc}.json"
+
+
+def zoning_name(num_mc, phase):
+    return f"zoning_{phase}_MC-{num_mc}.json"
+
+
+def initial_melt_pattern(num_mc):
+    return f"initial_melt_MC-{num_mc}*.csv"
+
+
+def final_melt_pattern(num_mc):
+    return f"final_melt_MC-{num_mc}*.csv"
 
 
 class PathResolver:
@@ -85,10 +103,10 @@ class AnalysisResolver:
     def make_image_dir(self):
         mkdir(self.image_dir)
 
-    def resolve_summary_paths(self, Num_MC) -> tuple:
+    def resolve_summary_paths(self, num_mc) -> tuple:
         return (
-            self.resolve() / Path(summary_file_name(Num_MC)),
-            self.resolve() / Path(summary_log_name(Num_MC))
+            self.resolve() / Path(summary_file_name(num_mc)),
+            self.resolve() / Path(summary_log_name(num_mc))
         )
 
     def resolve_image_path(self, imtype: str, ctx={}):
@@ -98,6 +116,47 @@ class AnalysisResolver:
             return self.image_dir / Path(f"./sample_hist_MC-{ctx.get('n')}")
         else:
             raise ValueError(f"imtype {imtype} cannot be recognized.")
+
+    def resolve_liquid_line(self, num_mc, summarize_method):
+        return self.resolve() / Path(f"./melt/{summarize_method}/{liquid_line_name(num_mc)}")
+
+    def resolve_zoning(self, num_mc, summarize_method, phase):
+        return self.resolve() / Path(f"./melt/{summarize_method}/{zoning_name(num_mc, phase)}")
+
+    def make_melt_dir(self, summarize_method):
+        mkdir(self.resolve() / Path("./melt/"))
+        mkdir(self.resolve() / Path(f"./melt/{summarize_method}"))
+
+    def list_sampled_melt_paths(self, num_mc, summarize_method):
+        """
+        Returns
+        -------
+        (
+            initial_melt_paths: List[Path],
+            final_melt_paths: List[Path]
+        )
+        """
+        return(
+            list((self.resolve() /
+                  Path(f"./melt/{summarize_method}")).glob(initial_melt_pattern(num_mc))),
+            list((self.resolve() /
+                  Path(f"./melt/{summarize_method}")).glob(final_melt_pattern(num_mc))),
+        )
+
+
+class McmcMeta:
+    def __init__(self, meta_path):
+        with open(meta_path) as f:
+            self.meta = json.load(f)
+
+    def data(self):
+        return self.meta.get("data")
+
+    def error(self):
+        return self.meta.get("error")
+
+    def option(self):
+        return self.meta.get("option")
 
 
 def invalid_result_directory(path: ResultResolver):
