@@ -4,7 +4,6 @@ const { ResultResolver, AnalysisResolver, McmcMeta } = require("./lib/common");
 const {
     read,
     concat_df,
-    getSummarizedParameters,
 } = require("../tool/show-magma-model")
 
 
@@ -17,18 +16,13 @@ program
         const analysis_dir = new AnalysisResolver(subdir)
         const samples = result_dir.list_sample_paths(num_mc)
         const meta = new McmcMeta(result_dir.list_meta_paths()[0])
-        const [summary_path, ..._] = analysis_dir.resolve_summary_path(num_mc)
-        const summary = read.csv(summary_path)
 
         const {
             model,
-            parameters,
             sampleMeltComposition
         } = require(meta.model("../"))(meta.option())
 
-        const summarized_params = getSummarizedParameters(
-            summary, summary_method, parameters
-        )
+        analysis_dir.make_melt_dir(summary_method)
 
         const df_parameters = concat_df(
             samples.map(read.csv)
