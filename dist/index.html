@@ -70,7 +70,7 @@
   <!-- Form -->
   <div id="form" class="card">
     <div class="inner_card title">
-      Console
+      PT-MCMC settings
     </div>
 
     <div class="flexRow" id="run_pain">
@@ -154,20 +154,22 @@
 
     <!-- MCMC operation -->
     <div class="flexRow" id="run_pain">
-      <div id="run_left" class="inner_card row">
+      <div class="inner_card row">
         <ul class="noLine">
-          <li>
-            <span class="instruction">MCMC trial time</span>
-            <span class="input_element">
-              <input id="iteration_input" type="number" value="0" max="1000000" min="1" required style="width: 10rem">
-            </span>
-          </li>
           <li>
             <span class="instruction">Number of chains</span>
             <span class="input_element">
               <input id="worker_number_input" type="number" value="1" max="128" min="1" required style="width: 10rem">
             </span>
           </li>
+
+          <li>
+            <span class="instruction">Random Seed ?</span>
+            <span class="input_element">
+              <input id="random_seed_flag_input" type="checkbox" checked>
+            </span>
+          </li>
+
           <li>
             <span class="instruction">Number of alpha</span>
             <span class="input_element">
@@ -177,23 +179,35 @@
         </ul>
       </div>
 
-      <div class="inner_card row column">
-        <span class="instruction">
-          Push to start or drag & drop previous meta file to restart
-        </span>
-        <input id="start_button" class="button round" type="button" value="Start">
-      </div>
-
     </div>
 
   </div>
 
-  <!-- Energy graphs -->
   <div class="card">
     <div class="inner_card title">
-      Posterior probabilities
+      Run PT-MCMC
     </div>
-    <div class="inner_card">
+    <div class="inner_card row column">
+      <li>
+        <span class="instruction">MCMC trial time</span>
+        <span class="input_element">
+          <input id="iteration_input" type="number" value="0" max="1000000" min="1" required style="width: 10rem">
+        </span>
+      </li>
+      <span class="instruction">
+        Push to start or drag & drop previous meta file to restart
+      </span>
+      <input id="start_button" class="button round" type="button" value="Start">
+    </div>
+  </div>
+
+  <div class="card" id="plot-settings">
+
+    <div class="inner_card row title">
+      Plot settings
+    </div>
+
+    <div id="run_left" class="inner_card row">
       <ul class="noLine">
         <li>
           <span class="instruction">Plot interval</span>
@@ -201,10 +215,28 @@
             <input id="plotInterval_input" type="number" value="1" max="1000000" min="1" required style="width: 10rem">
           </span>
         </li>
+
+        <li>
+          <span class="instruction">Plot MCMC No. (0 ~ )</span>
+          <span class="input_element">
+            <input id="idPlotMCMC_input" type="number" value="0" max="1000000" min="0" required style="width: 10rem">
+          </span>
+        </li>
       </ul>
     </div>
-    <div id="energy_chart" class="inner_card">
 
+    <div class="inner_card">
+      Iterration:
+      <span id="presentCount">0</span>/
+      <span id="totalCount">0</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="inner_card title">
+      Posterior probabilities
+    </div>
+    <div id="energy_chart" class="inner_card">
     </div>
   </div>
 
@@ -223,9 +255,7 @@
   <!-- Sampling, accepted, download result -->
   <div id="summary_pain" class="card">
     <div class="inner_card title">
-      Sampled result:
-      <span id="presentCount">0</span>/
-      <span id="totalCount">0</span>
+      Sampled result
     </div>
 
 

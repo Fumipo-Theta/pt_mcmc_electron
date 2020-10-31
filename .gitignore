@@ -1,0 +1,10 @@
+.*
+!.gitignore
+*.ipynb
+node_modules/
+result/
+__pycache__
+results/
+analyzed/**/image
+analyzed/**/melt
+computed

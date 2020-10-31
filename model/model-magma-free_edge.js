@@ -1,836 +1,408 @@
-/**
- * The model returns chemical profile of Fe/Mg and Cr in a orthopyroxene phenocryst.
- * 
- * Consider crustal processes below:
- * 1. Multiple rapid changes of melt composition
- * 2. Crystal growth of
- *  a. Olivine (Si-Mg-Fe-Cr-Ni)
- *  b. Orthopyroxene (Si-Mg-Fe-Al-Ca-Cr-Ni)
- *  c. Spinel (Cr-Ni)
- *  in the host melt
- * 3. Lattice diffusion of
- *  a. Fe-Mg interdiffusion
- *  b. Cr self diffusion
- *  in orthopyroxene
- */
-
-if (typeof require === "undefined") {
-  importScripts(
-    '../../../phase/js/geochem.js',
-    '../../../phase/js/chemical_profile.js',
-    '../../../phase/js/phase.js',
-    '../../../phase/js/liquid.js',
-    '../../../phase/js/solid.js',
-    '../../../jslib/matrix/matrix.js',
-    '../../../phase/js/equilibrate.js',
-    '../../../phase/js/partitioning.js',
-    '../../../phase/js/exchangePartitioning.js',
-    '../../../phase/js/geothermobarometer.js',
-    '../../../phase/js/magma-system.js',
-    '../../../jslib/funcTools.js',
-    '../../../diffusion/js/diffusion.js',
-    '../../../diffusion/js/inter-diffusion.js',
-    '../../../diffusion/js/self-diffusion.js'); // SelfDiffusion*/
-  //console.log(this);
-}
-
-(function (root, factory) {
-  if (typeof define === 'function' && define.amd) {
-    define([], factory);
-  } else if (typeof exports === 'object') {
-    module.exports = factory();
-  } else {
-    root.Model = factory(
-      root.Liquid,
-      root.Solid,
-      root.geothermobarometer,
-      root.Equilibrate,
-      root.partitioning,
-      root.exchangePartitioning,
-      root.MagmaSystem,
-      root.InterDiffusion,
-      root.SelfDiffusion,
-      root.Diffusion
-    );
-  }
-}(this, function (
-  _Liquid,
-  _Solid,
-  _geothermobarometer,
-  _Equilibrate,
-  _D,
-  _KD,
-  _MagmaSystem,
-  _InterDiffusion,
-  _SelfDiffusion,
-  _Diffusion
-) {
-  const Liquid = (typeof require === 'undefined' && (typeof _Liquid === 'object' || typeof _Liquid === 'function'))
-    ? _Liquid
-    : require('../../phase/js/liquid');
-
-  const Solid = (typeof require === 'undefined' && (typeof _Solid === 'object' || typeof _Solid === 'function'))
-    ? _Solid
-    : require('../../phase/js/solid');
-
-  const geothermobarometer = (typeof require === 'undefined' && (typeof _geothermobarometer === 'object' || typeof _geothermobarometer === 'function'))
-    ? _geothermobarometer
-    : require('../../phase/js/geothermobarometer');
-
-
-  const Equilibrate = (typeof require === 'undefined' && (typeof _Equilibrate === 'object' || typeof _Equilibrate === 'function'))
-    ? _Equilibrate
-    : require('../../phase/js/equilibrate');
-
-  const D = (typeof require === 'undefined' && (typeof _D === 'object' || typeof _D === 'function'))
-    ? _D
-    : require('../../phase/js/partitioning');
-
-  const KD = (typeof require === 'undefined' && (typeof _KD === 'object' || typeof _KD === 'function'))
-    ? _KD
-    : require('../../phase/js/exchangePartitioning');
-
-  const MagmaSystem = (typeof require === 'undefined' && (typeof _MagmaSystem === 'object' || typeof _MagmaSystem === 'function'))
-    ? _MagmaSystem
-    : require('../../phase/js/magma-system');
-
-  const InterDiffusion = (typeof require === 'undefined' && (typeof _InterDiffusion === 'object' || typeof _InterDiffusion === 'function'))
-    ? _InterDiffusion
-    : require('../../diffusion/js/inter-diffusion');
-
-  const SelfDiffusion = (typeof require === 'undefined' && (typeof _SelfDiffusion === 'object' || typeof _SelfDiffusion === 'function'))
-    ? _SelfDiffusion
-    : require('../../diffusion/js/self-diffusion');
-
-  const Diffusion = (typeof require === 'undefined' && (typeof _Diffusion === 'object' || typeof _Diffusion === 'function'))
-    ? _Diffusion
-    : require('../../diffusion/js/diffusion');
-
-
-
-  /**
-   * option : {
-   *  targetPhase: String,
-   *  D0 :{
-   *    orthopyroxene : {
-   *      Fe_Mg : {
-   *        d0 : Number,
-   *        E : Number
-   *      },
-   *      Cr2O3 : {
-   *        d0 : Number,
-   *        E : Number
-   *      }
-   *    }
-   *  },
-   *  dF : Number,
-   *  radius : [Number],
-   *  finalMelt : {
-   *    composition : {
-   *      SiO2 : Number,
-   *      ...
-   *      H2O : Number
-   *    },
-   *    Fe2Ratio : Number
-   *  },
-   *  P : [Number],
-   *  MgN_atRim : Number
-   * }
-   */
-  return option => {
-
-    const { thermometer, barometer, oxybarometer } = geothermobarometer;
-
-    /** Utility functions
-     * 
-     */
-    const repeatedArray = n => (array) => Array(n)
-      .fill(0)
-      .map(_ => [...array])
-      .reduce((a, b) => [...a, ...b]);
-    const checkInRange = (min, max) => x => (min <= x && x <= max);
-    const checkExceed = (target, sign = 1.) => x => (x - target) * sign > 0;
-    const checkSame = (target, eps) => x => Math.abs(x - target) < eps;
-    const getD = (D, phase, component) => Diffusion.getD(D, phase, component);
-
-
-    /**
-     * Create objects of host melt, olivine, orthopyroxene, and spinel.
-     * Register partitioning coefficient (Nernst's and exchange type) to each solid phase.
-     * Register equilibrium liquid phase to each solid phase.
-     * 
-     * @param {}
-     * @return {Object}
-     *  @property {Array} 
-     *    @property {Liquid} melt
-     *    @property {Solid} olivine
-     *    @property {Solid} orthopyroxene
-     *    @property {Solid} spinel
-     */
-    const createPhase = () => {
-
-      const melt = new Liquid('melt').initialize()
-
-      const olivine = new Solid('olivine')
-        .initialize()
-        .setKD({
-          'Fe_Mg': KD.olivine.Fe_Mg.Beattie1993()
-        })
-        .setD({
-          'Cr2O3': D.olivine.Cr2O3.FreiS2009(),
-          'NiO': D.olivine.NiO.NormanS2005(),
-          'Al2O3': D.olivine.Al2O3.myCompile(melt),
-          'CaO': D.olivine.CaO.myCompile(melt),
-          'TiO2': D.olivine.TiO2.dummy()
-        })
-        .setSolver('melt', Equilibrate.olivine_melt(melt, 'solve'));
-
-      const orthopyroxene = new Solid('orthopyroxene')
-        .initialize()
-        .setKD({ 'Fe_Mg': KD.orthopyroxene.Fe_Mg.Beattie1993() })
-        .setD({
-          'Cr2O3': D.orthopyroxene.Cr2O3.FreiS2009(),
-          'NiO': D.orthopyroxene.NiO.NormanS2005(),
-          'Al2O3': D.orthopyroxene.Al2O3.myCompile(melt),
-          'CaO': D.orthopyroxene.CaO.myCompile(melt),
-          'TiO2': D.orthopyroxene.TiO2.dummy()
-        })
-        .setSolver('melt', Equilibrate.opx_melt(melt, 'solve'));
-
-      const spinel = new Solid('spinel')
-        .initialize()
-        .setD({
-          'Cr2O3': D.spinel.Cr2O3.LieS2008(),
-          'NiO': D.spinel.NiO.LieS2008()
-        })
-        .setSolver('melt', Equilibrate.spinel_melt(melt, 'solve'));
-
-      const meltThermometer = (P) => thermometer.Sugawara2000(melt)(P) - thermometer.liquidusDropMG2008(melt)(P);
-
-      return {
-        phase: [melt, olivine, orthopyroxene, spinel],
-        thermometer: meltThermometer
-      }
-    }
-
-    /**
-     * Create object to simulate lattice diffusion. 
-     * 
-     * @param {MagmaSystem} magma 
-     * @param {*} ope 
-     */
-    const initialize = (magma, ope) => {
-      const { targetPhase, D, finalMelt } = ope;
-
-      magma.setThermodynamicAgent(createPhase());
-      magma.phase.melt.setComposition(finalMelt.composition)
-        .setFe2Ratio(finalMelt.Fe2Ratio)
-        .compensateFe()
-
-      const FeMgDif = new InterDiffusion('FeO', 'MgO', getD(D, targetPhase, 'Fe_Mg'), 'atom')
-
-      const CrDif = new SelfDiffusion('Cr2O3', getD(D, targetPhase, 'Cr2O3'))
-
-      magma.setDiffusionProfile(FeMgDif, targetPhase, 'Fe_Mg');
-      magma.setDiffusionProfile(CrDif, targetPhase, 'Cr2O3');
-      magma.custom.profileStack = [];
-      magma.custom.mixingLineStack = [];
-      magma.custom.differentiationLineStack = [];
-
-      return {}
-    }
-
-
-    /** recordLocalEquilibriumCondition
-     * Simulate transition of the composition of host melt and involved solid phases
-     *   during a reaction of melting or crystallization. 
-     * It starts from a condition where the host melt has a specific composition. 
-     * In each calculation step of, we calculate composition of solid phases 
-     *   by using partitioning coefficient assuming achievement of local equilibrium with host melt.
-     * Then, when crystal growth is considered, small fraction of solid phases are removed from the host melt. 
-     * On the other hand, when assimilation of crystal is considered, they are added to the host melt. 
-     * In the calculation, we use Mg# of some phase as an extent of progression of the reaction.
-     * Until Mg# of the focused phase becomes a given value, the steps are repeated. 
-     * 
-     * @param {*} magma 
-     * @param {*} observedPhaseName 
-     * @param {*} targetMgN 
-     * @param {*} stoichiometry 
-     * @param {*} dF 
-     * @param {*} isRecord 
-     * 
-     * moveCrystalBoundary(
-     *  magma,
-     *  'orthopyroxene',
-     *  91.5,
-     *  {olivine : 0.5, orthopyroxene : 0.495, spinel : 0.005},
-     *  0.001,
-     *  true
-     * )
-     */
-    const recordLocalEquilibriumCondition = (
-      magma, observedPhaseName, targetMgN, stoichiometry, dF, isRecord
-    ) => {
-      const melt = magma.phase.melt;
-
-      const observedPhase = magma.phase[observedPhaseName];
-      let { T, P } = magma.getThermodynamicProperty();
-      observedPhase.equilibrate('melt', T, P)
-
-      const { sign, pathName } = (observedPhase.getMgNumber() < targetMgN)
-        ? { sign: 1., pathName: 'ascend' }
-        : { sign: -1., pathName: 'descend' };
-
-      const isExceed = checkExceed(targetMgN, sign);
-      const isInRange = checkInRange(-1, 1);
-      const isSame = checkSame(targetMgN, 1e-3);
-      let F = 0;
-      const solids = Object.entries(magma.solids());
-
-      solids.map(([_, phase]) => {
-        phase.resetProfile(pathName);
-      })
-
-      melt.resetProfile(pathName);
-
-      // repeat until Mg# of targetPhase exceeds targetMgN or F becomes out of range [0,1]
-      let limit = 0
-      melt.startDifferentiate();
-      while (isInRange(F)
-        && !isExceed(observedPhase.getMgNumber())
-        && !melt.outOfRange
-      ) {
-        let { T, P } = magma.getThermodynamicProperty();
-
-        // equilibrate & record
-        solids.map(entry => {
-          entry[1].equilibrate('melt', T, P)
-        })
-        if (isRecord) {
-          solids.map(([name, phase]) => {
-            phase.pushProfile(stoichiometry[name] * F, T, P, pathName)
-          })
-          melt.pushProfile(1 + F * sign, T, P, pathName)
-        }
-
-        // change melt as not exceeding final condition
-        melt.differentiate(
-          solids.map(([name, phase]) => { return { phase: phase, f: stoichiometry[name] } }),
-          dF * sign
-        )
-          .compensateFe()
-
-        // to check whether exceeding final condition
-        observedPhase.equilibrate('melt', T, P)
-
-        // While exceeding final condition, 
-        //  revert melt composition and add/remove 
-        //  smaller fraction of solid again.
-        while (isExceed(observedPhase.getMgNumber())) {
-          let { T, P } = magma.getThermodynamicProperty();
-
-          // revert change of melt composition
-          melt.differentiate(
-            solids.map(([name, phase]) => { return { phase: phase, f: stoichiometry[name] } }),
-            dF * sign / (1 + dF * sign) * -1
-          ).compensateFe()
-
-          // change with smaller fraction
-          dF *= 0.5;
-          melt.differentiate(
-            solids.map(([name, phase]) => { return { phase: phase, f: stoichiometry[name] } }),
-            dF * sign
-          ).compensateFe()
-
-          // re-equilibrate to check whether exceeding final condition
-          solids.map(entry => {
-            entry[1].equilibrate('melt', T, P)
-          })
-
-          limit++
-          if (limit > 100) break;
-        }
-        //=========================
-
-        // Update total fraction not exceeding final condition
-        F += dF;
-
-        if (isSame(observedPhase.getMgNumber())) break;
-      }
-
-      // Record final state
-      if (isRecord) {
-        solids.map(entry => {
-          let name = entry[0], phase = entry[1];
-          phase.pushProfile(stoichiometry[name] * F, T, P, pathName);
-        })
-        melt.pushProfile(1 + F * sign, T, P, pathName);
-      }
-      return pathName;
-
-    }
-
-
-
-    /** 
-     * Approximated simulation of magma mixing. 
-     * The exotic melt composition and its mass contribution to the mixture is unknown.
-     * 
-     * We approximate the mixture composition by assuming 
-     *   mixture and erupted melt are on the same liquid line of ascent or that of descent.
-     * Therefore, the mixture can be calculated by addition or removing of small fraction of
-     *   solid phases repeatedly.
-     *  
-     * @param {*} magma 
-     * @param {*} ope 
-     * @param {*} result
-     */
-    const approximateMagmaMixing = (magma, ope, result) => {
-      const {
-        dF,
-        targetPhase,
-        MgN_beforeMixing,
-        stoichiometry,
-        P
-      } = ope
-
-      magma.setThermodynamicAgent({
-        barometer: _ => P
-      })
-
-      const pathName = recordLocalEquilibriumCondition(
-        magma,
-        targetPhase,
-        MgN_beforeMixing,
-        stoichiometry,
-        dF,
-        true
-      )
-
-      magma.custom.mixingLineStack.push(
-        magma.phase.melt.profile[pathName].get()
-      )
-
-      return {}
-    }
-
-    /** 
-     * Crystals grow in the host melt which is already set composition.
-     * Composition of growing part of crystals are calculated by mass balance equation with partitioning coefficients 
-     *   by assuming establishment of local equilibrium.
-     * Once the part of crystal grows, it no longer has effect on the part of growing crystal after it.
-     * Therefore, the condition of crystal growth is Rayleigh fractionation. 
-     * 
-     * Considered solid phases are: 
-     *  1. olivine
-     *  2. orthopyroxene
-     *  3. spinel
-     * Reaction stoichiometry of solid phases are constant. 
-     * In this method, stoichiometry of orthopyroxene and spinel are given. 
-     * 
-     * Crystal grow until Mg# of a given phase reach a specific value. 
-     */
-    const growCrystals = (magma, ope, result) => {
-      const {
-        dF,
-        targetPhase,
-        MgN_beforeCrystallization,
-        stoichiometry,
-        P
-      } = ope;
-
-      magma.setThermodynamicAgent({
-        barometer: _ => P
-      })
-
-      // 結晶成長を伴うメルト組成変化
-      const pathName = recordLocalEquilibriumCondition(
-        magma,
-        targetPhase,
-        MgN_beforeCrystallization,
-        stoichiometry,
-        dF,
-        true
-      )
-      /**
-        * 注目する相のプロファイルをスタックに追加
-        */
-      magma.custom.profileStack.push(
-        magma.phase[targetPhase].profile[pathName].get()
-      )
-
-      magma.custom.differentiationLineStack.push(
-        magma.phase.melt.profile[pathName].get()
-      )
-      return {}
-    }
-
-    /**
-     * Calculate radius in the crystal by assuming spherical shape and constant density 
-     *   from mass fraction at each step of growth. 
-     * The initial and final radius are known by line analysis with EPMA. 
-     * 
-     * @param {*} initialRadius 
-     * @param {*} finalRadius 
-     * @param {*} totalMass 
-     */
-    const massToRadiusByConstantDensity = (initialRadius, finalRadius, totalMass) => {
-      const A = (Math.pow(finalRadius, 3) - Math.pow(initialRadius, 3)) / totalMass;
-      return f => Math.pow(A * (totalMass - f) + Math.pow(initialRadius, 3), 1 / 3)
-    }
-
-    const reverseProfile = (profile) => {
-      const newProfile = {};
-      Object.entries(profile)
-        .map(([k, v]) => {
-          newProfile[k] = [...v].reverse()
-        })
-      return newProfile;
-    }
-
-    /**
-     * Relate composition and radius in the position of the crystal. 
-     * 
-     * @param {*} magma 
-     * @param {*} targetPhase 
-     * @param {*} Rini 
-     * @param {*} Rfin 
-     */
-    const getProfileWithRadius = (profile, Rini, Rfin) => {
-      const newProfile = Object.assign(profile, {});
-      const l = newProfile.F.length;
-      newProfile.x = newProfile.F.map(massToRadiusByConstantDensity(Rini, Rfin, newProfile.F[0]));
-      return newProfile;
-    }
-
-    /**
-     * Simulate elemental diffusion in the focused crystal. 
-     * The crystal is spherical symmetry. 
-     * Diffusion coefficients depends only on temperature as Arrhenius relation. 
-     * 
-     * In the model, inter diffusivity of Fe and Mg components and self diffusivity of Cr2O3 are 
-     *  considered. 
-     * During diffusion, the host melt composition is constant and local equilibrium at crystal surface
-     *  always established. 
-     * 
-     * Spatially one dimension diffusion equation is numerically solved by Crank-Nicolson method. 
-     * Neumann condition at the center of crystal, and Dericklet condition at the edge. 
-     * 
-     * The scale of time and temperature for diffusivity is treated as unknown parameter, 'total scale of diffusion'. 
-     * The scale is originally introduced by Lasaga (1983) as compressed time. 
-     * Total scale of diffusion represent all possible cooling history which yields the same value of compressed time. 
-     * 
-     * @param {MagmaSystem} magma 
-     * @param {*} ope 
-     * @param {*} result 
-     */
-    const operateDiffusion = (magma, ope, result) => {
-      const { targetPhase, tau, R, Rprev, divNum } = ope;
-
-      // chemical profileを取得
-      const profile = (magma.custom.profileStack.length > 0)
-        ? reverseProfile(magma.custom.profileStack.pop())
-        : {};
-
-      const section = getProfileWithRadius(profile, Rprev, R)
-
-      const diffusionInSphere = magma.getDiffusionProfile(targetPhase);
-      Object.values(diffusionInSphere).map(d => {
-        d.appendSection(section)
-          .setMaxCompressedTime(tau)
-          .divideSpaceEqually(divNum)
-          .nondimensionalize()
-          .implicitCN()
-          .redimensionalize()
-      })
-
-      return {}
-    }
-
-    /** 
-     * Assumed crustal processes are reputation of magma mixing, crystal growth, 
-     *   and elemental diffusion in crystals.
-     * The time of reputation is the same as number of growth stage of the focused crystal. 
-     * 
-     * eruptedMelt =>
-     * ascend(push profile) -> beforeMixing ->
-     * ascend(push profile) -> beforeMixing ->
-     * ...->
-     * ascend(push profile)
-     * => primaryMelt
-     * 
-     * then 
-     * section.push(reverse(profileStack.pop()))
-     *  .diffuse()
-     *  .push(reverse(profileStack.pop()))
-     *  .diffuse()
-     *  ...
-    */
-    const repeat = repeatedArray(option.radius.length - 1);
-    /**
-     * 噴出マグマから初生マグマまで結晶成長とマグマ混合をさかのぼっていく
-     */
-    const magmaProcessesSequence = [
-      ...repeat([approximateMagmaMixing, growCrystals]),
-      ...repeat([operateDiffusion])
-    ]
-
-    /** 
-     * MagmaSystemに登録されたある相の拡散プロファイルを統合し, 
-     * モデルオブジェクトの形に整形する
-     * 
-     * @param {*} magma 
-     * @param {*} opt 
-     */
-    const integrateDiffusedProfile = (magma, opt) => {
-      const diffusion = magma.diffusionProfiles[opt.targetPhase];
-      const { dataPos } = opt;
-
-      return Object.entries(diffusion).map(([k, v]) => {
-        // データに合わせてxの位置を変形
-        v.profile.transformByRadius(dataPos)
-
-        const p = v.profile.get()
-        const obj = {}
-        obj.x = p.x;
-        obj[k] = p.c
-        return obj
-      }).reduce((a, b) => Object.assign(a, b), {})
-    }
-
-    //console.log(magmaProcessesSequence)
-    /** Create magma system 
-     * 
-     */
-    const magma = new MagmaSystem()
-    magma
-      .setThermodynamicHandler(
-        (magma, opt) => {
-          const P = magma.barometer();
-          return {
-            T: magma.thermometer(P),
-            P: P
-          }
-        }
-      )
-      .setAction([
-        initialize,
-        ...magmaProcessesSequence
-      ])
-      .setFinalAction(
-        integrateDiffusedProfile
-      )
-
-
-    /** ================================================
-     * The model finally generate chemical profile of orthopyroxene.
-     * The host melt is always homogenous. 
-     * Therefore, crystal composition represents whole part of the magma system.
-     * The crystals are spherical symmetry. 
-     * The crystal experiences multiple stages of crystal growth and lattice diffusion.
-     * The lattice diffusion progresses after crystal growth terminated in each stage.
-     * The chemical composition of grown crystal determined by host melt composition and partitioning coefficients. 
-     * 
-     * 
-     * @param {Array} parameters
-     *  @element {Object}
-     *    @property {Number} ini
-     *    @property {Number} fin
-     *    @property {Number} orthopyroxene_init
-     *    @property {Number} spinel_init
-     *    @property {Number} tau
-     * 
-     * @param {Object} data
-     *  @property {Array} x
-     *  @property {Array} Fe_Mg
-     *  @property {Array} Cr2O3
-     * 
-     * @return {Object}
-     *  @property {Array} x
-     *  @property {Array} Fe_Mg
-     *  @property {Array} Cr2O3
-     */
-    const getParameterGrowth = (p, i, option) => {
-      return {
-        'dF': option.dF,
-        'targetPhase': option.targetPhase,
-        'MgN_beforeCrystallization': p.MgN_beforeCrystallization,
-        'stoichiometry': {
-          'olivine': 1 - p.growth_stoichiometry_orthopyroxene
-            - p.growth_stoichiometry_spinel,
-          'orthopyroxene': p.growth_stoichiometry_orthopyroxene,
-          'spinel': p.growth_stoichiometry_spinel
-        },
-        /*'Fe2Ratio': option.melt0.Fe2Ratio, include in option.melt*/
-        'P': option.P[i]
-      }
-    }
-
-    const getParameterGrowthRim = (p, i, option) => {
-      return {
-        'dF': option.dF,
-        'targetPhase': option.targetPhase,
-        'MgN_beforeMixing': option.MgN_atRim,
-        'stoichiometry': {
-          'olivine': 1 - p.mixing_stoichiometry_orthopyroxene
-            - p.mixing_stoichiometry_spinel,
-          'orthopyroxene': p.mixing_stoichiometry_orthopyroxene,
-          'spinel': p.mixing_stoichiometry_spinel
-        },
-        'P': option.P[i]
-      }
-    }
-
-    const getParameterMixing = (p, i, option) => {
-      return {
-        'dF': option.dF,
-        'targetPhase': option.targetPhase,
-        'MgN_beforeMixing': p.MgN_beforeMixing,
-        'stoichiometry': {
-          'olivine': 1 - p.mixing_stoichiometry_orthopyroxene
-            - p.mixing_stoichiometry_spinel,
-          'orthopyroxene': p.mixing_stoichiometry_orthopyroxene,
-          'spinel': p.mixing_stoichiometry_spinel
-        },
-        'P': option.P[i]
-      }
-    }
-
-    const getParameterDiffusion = (p, i, option) => {
-      return {
-        'targetPhase': option.targetPhase,
-        'tau': p.log10_tau,
-        'R': option.radius[i + 1],
-        'Rprev': option.radius[i],
-        'divNum': (i + 1) * 10
-      }
-    }
-
-    const model = (_parameters, data, isMCMC = true) => {
-      // new
-      const parameters = [..._parameters];
-
-      const parametersLiquidLine = [];
-      const parametersDiffusion = [];
-      const last = parameters.length - 1;
-      let i = last
-      while (i >= 0) {
-        let p = parameters.pop();
-        parametersLiquidLine.push(getParameterMixing(p, i, option));
-        parametersLiquidLine.push(getParameterGrowth(p, i, option));
-        parametersDiffusion.push(getParameterDiffusion(p, last - i, option));
-        i--;
-      }
-
-      const modelParameters = [
-        ...parametersLiquidLine,
-        ...parametersDiffusion
-      ];
-
-      //console.log(modelParameters)
-
-      const modeled = magma.execAction([
-        {
-          'targetPhase': option.targetPhase,
-          'D': option.D0,
-          'finalMelt': option.finalMelt,
-        },
-        ...modelParameters,
-        {
-          'targetPhase': option.targetPhase,
-          'dataPos': data.x
-        }
-      ])
-
-      return (isMCMC)
-        ? modeled
-        : magma
-
-    }
-
-
-    /**
-     * Initial value of parameters are not important.
-     */
-    const parameters = Array(option.radius.length - 1).fill(0).map((_) => {
-      return {
-        'MgN_beforeCrystallization': 85,
-        'growth_stoichiometry_orthopyroxene': 0.5,
-        'growth_stoichiometry_spinel': 0.05,
-        'MgN_beforeMixing': 80,
-        'mixing_stoichiometry_orthopyroxene': 0.5,
-        'mixing_stoichiometry_spinel': 0.05,
-        'log10_tau': 6
-      }
-    });
-
-    /**
-     * In the model, initial and final Mg# of the orthopyroxene phenocryst during crystal growth are unknown parameters. 
-     */
-    const updateCondition = (option.hasOwnProperty("updateCondition"))
-      ? option.updateCondition
-      : {
-        'MgN_beforeCrystallization': {
-          'val': 0.5,
-          'max': 93,
-          'min': 75
-        },
-        'growth_stoichiometry_orthopyroxene': {
-          'val': 0.05,
-          'max': 1,
-          'min': 0
-        },
-        'growth_stoichiometry_spinel': {
-          'val': 0.005,
-          'max': 0.1,
-          'min': 0
-        },
-        'MgN_beforeMixing': {
-          'val': 0.5,
-          'max': 93,
-          'min': 75
-        },
-        'mixing_stoichiometry_orthopyroxene': {
-          'val': 0.05,
-          'max': 1,
-          'min': 0
-        },
-        'mixing_stoichiometry_spinel': {
-          'val': 0.005,
-          'max': 0.1,
-          'min': 0
-        },
-        'log10_tau': {
-          'val': 0.1,
-          'max': 12,
-          'min': 0
-        }
-      }
-
-    /**
-     * 結晶化前のMg#は結晶化後のMg#, すなわちマグマ混合前のMg#より大きい.
-     * 最外部のセクションの結晶化前のMg#は結晶のリムのMg#より大きい.
-     * 
-     */
-    const constrain = {
-      MgN_beforeCrystallization: (cand, i, parameter) => cand > parameter[i].MgN_beforeMixing,
-      MgN_beforeMixing: (cand, i, parameter) => cand < parameter[i].MgN_beforeCrystallization,
-      growth_stoichiometry_orthopyroxene: (cand, i, parameter) => (0 < cand && cand + parameter[i].growth_stoichiometry_spinel <= 1),
-      growth_stoichiometry_spinel: (cand, i, parameter) => cand + parameter[i].growth_stoichiometry_orthopyroxene <= 1,
-      mixing_stoichiometry_orthopyroxene: (cand, i, parameter) => (0 < cand && cand + parameter[i].mixing_stoichiometry_spinel <= 1),
-      mixing_stoichiometry_spinel: (cand, i, parameter) => cand + parameter[i].mixing_stoichiometry_orthopyroxene <= 1
-    }
-
-    const mode = "estimator";
-
-    return {
-      model,
-      parameters,
-      updateCondition,
-      constrain,
-      mode,
-      magma
-    };
-  }
-}
-))
+(function webpackUniversalModuleDefinition(root, factory) {
+	if(typeof exports === 'object' && typeof module === 'object')
+		module.exports = factory();
+	else if(typeof define === 'function' && define.amd)
+		define([], factory);
+	else {
+		var a = factory();
+		for(var i in a) (typeof exports === 'object' ? exports : root)[i] = a[i];
+	}
+})(this, function() {
+return /******/ (function(modules) { // webpackBootstrap
+/******/ 	// The module cache
+/******/ 	var installedModules = {};
+/******/
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/
+/******/ 		// Check if module is in cache
+/******/ 		if(installedModules[moduleId]) {
+/******/ 			return installedModules[moduleId].exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = installedModules[moduleId] = {
+/******/ 			i: moduleId,
+/******/ 			l: false,
+/******/ 			exports: {}
+/******/ 		};
+/******/
+/******/ 		// Execute the module function
+/******/ 		modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
+/******/
+/******/ 		// Flag the module as loaded
+/******/ 		module.l = true;
+/******/
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/
+/******/
+/******/ 	// expose the modules object (__webpack_modules__)
+/******/ 	__webpack_require__.m = modules;
+/******/
+/******/ 	// expose the module cache
+/******/ 	__webpack_require__.c = installedModules;
+/******/
+/******/ 	// define getter function for harmony exports
+/******/ 	__webpack_require__.d = function(exports, name, getter) {
+/******/ 		if(!__webpack_require__.o(exports, name)) {
+/******/ 			Object.defineProperty(exports, name, { enumerable: true, get: getter });
+/******/ 		}
+/******/ 	};
+/******/
+/******/ 	// define __esModule on exports
+/******/ 	__webpack_require__.r = function(exports) {
+/******/ 		if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 			Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 		}
+/******/ 		Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 	};
+/******/
+/******/ 	// create a fake namespace object
+/******/ 	// mode & 1: value is a module id, require it
+/******/ 	// mode & 2: merge all properties of value into the ns
+/******/ 	// mode & 4: return value when already ns object
+/******/ 	// mode & 8|1: behave like require
+/******/ 	__webpack_require__.t = function(value, mode) {
+/******/ 		if(mode & 1) value = __webpack_require__(value);
+/******/ 		if(mode & 8) return value;
+/******/ 		if((mode & 4) && typeof value === 'object' && value && value.__esModule) return value;
+/******/ 		var ns = Object.create(null);
+/******/ 		__webpack_require__.r(ns);
+/******/ 		Object.defineProperty(ns, 'default', { enumerable: true, value: value });
+/******/ 		if(mode & 2 && typeof value != 'string') for(var key in value) __webpack_require__.d(ns, key, function(key) { return value[key]; }.bind(null, key));
+/******/ 		return ns;
+/******/ 	};
+/******/
+/******/ 	// getDefaultExport function for compatibility with non-harmony modules
+/******/ 	__webpack_require__.n = function(module) {
+/******/ 		var getter = module && module.__esModule ?
+/******/ 			function getDefault() { return module['default']; } :
+/******/ 			function getModuleExports() { return module; };
+/******/ 		__webpack_require__.d(getter, 'a', getter);
+/******/ 		return getter;
+/******/ 	};
+/******/
+/******/ 	// Object.prototype.hasOwnProperty.call
+/******/ 	__webpack_require__.o = function(object, property) { return Object.prototype.hasOwnProperty.call(object, property); };
+/******/
+/******/ 	// __webpack_public_path__
+/******/ 	__webpack_require__.p = "";
+/******/
+/******/
+/******/ 	// Load entry module and return exports
+/******/ 	return __webpack_require__(__webpack_require__.s = "./model-src/opx_zoning_free_edge/index.js");
+/******/ })
+/************************************************************************/
+/******/ ({
+
+/***/ "../diffusion/src/diffusion.js":
+/*!*************************************!*\
+  !*** ../diffusion/src/diffusion.js ***!
+  \*************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("function _readOnlyError(name) { throw new Error(\"\\\"\" + name + \"\\\" is read-only\"); }\n\nfunction _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread(); }\n\nfunction _nonIterableSpread() { throw new TypeError(\"Invalid attempt to spread non-iterable instance\"); }\n\nfunction _iterableToArray(iter) { if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === \"[object Arguments]\") return Array.from(iter); }\n\nfunction _arrayWithoutHoles(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } }\n\nfunction _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError(\"Cannot call a class as a function\"); } }\n\nfunction _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if (\"value\" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }\n\nfunction _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }\n\n/* Object Diffusion\r\n\tDiffusionオブジェクトは1つのある元素について, 結晶化による累帯構造の成長と結晶内部での元素拡散によって形成される組成プロファイルを計算する\r\n\r\n\t元素拡散によるホストメルトの組成変化を計算できるようにする\r\n\r\n\t塩素拡散開始前の固相・液相質量比がわかっているので，マスバランスで計算できる\r\n\r\n\tprofile:{\r\n\t\tx:[],\r\n\t\tc:[]\r\n\t}\r\n*/\nvar ChemicalProfile = __webpack_require__(/*! ../../phase/src/chemical_profile */ \"../phase/src/chemical_profile.js\");\n\nvar funcTools = __webpack_require__(/*! ../../jslib/funcTools */ \"../jslib/funcTools.js\");\n\nvar Diffusion =\n/*#__PURE__*/\nfunction () {\n  function Diffusion(coefficient) {\n    _classCallCheck(this, Diffusion);\n\n    this.profile = new ChemicalProfile([\"x\", \"c\"]);\n    this.notDiffusedProfile = new ChemicalProfile([\"x\", \"c\"]);\n    this.ndprofile = new ChemicalProfile([\"x\", \"c\"]);\n    this.coefficient = coefficient;\n    this.tau = 0;\n    this.step = 0;\n    this.sectionNum = 0;\n    this.divNtau = 0;\n\n    this.cMap = function (section) {\n      return null;\n    };\n\n    this.initialize();\n    return this;\n  }\n\n  _createClass(Diffusion, [{\n    key: \"initialize\",\n    value: function initialize() {}\n  }, {\n    key: \"getNDprofile\",\n    value: function getNDprofile() {\n      return this.ndprofile.get();\n    }\n  }, {\n    key: \"getProfile\",\n    value: function getProfile() {\n      return this.profile.get();\n    }\n  }, {\n    key: \"getNotDiffusedProfile\",\n    value: function getNotDiffusedProfile() {\n      return this.notDiffusedProfile.get();\n    }\n    /** Append section\r\n     * このメソッドは外部で生成したセクションオブジェクトの入力に関するインターフェースである\r\n     */\n\n  }, {\n    key: \"setSection\",\n    value: function setSection(section) {\n      if (!function (o) {\n        return [o.hasOwnProperty(\"x\"), o.hasOwnProperty(\"T\")].reduce(function (a, b) {\n          return a && b;\n        });\n      }(section)) return new Error(\"Inverid format section appended\"); ////console.log(section[key])\n\n      this.profile.set({\n        x: _toConsumableArray(section.x),\n        c: this.cMap(section)\n      });\n      this.notDiffusedProfile.set({\n        x: _toConsumableArray(section.x),\n        c: this.cMap(section)\n      });\n      this.setNeumanCondition(\"center\");\n      var l = this.profile.getLength(\"x\");\n      this.temperature = _toConsumableArray(section.T).pop();\n      this.divNtau = parseInt(l * l); // 計算を早めるためのファクターをかけた場合\n      //this.divNtau=parseInt(l*l);\n\n      this.tau = 0;\n      this.step = 0;\n      return this;\n    }\n  }, {\n    key: \"appendSection\",\n    value: function appendSection(section) {\n      if (!function (o) {\n        return [o.hasOwnProperty(\"x\"), o.hasOwnProperty(\"T\")].reduce(function (a, b) {\n          return a && b;\n        });\n      }(section)) return new Error(\"Inverid format section appended\"); ////console.log(section[key])\n\n      this.profile.concat({\n        x: _toConsumableArray(section.x),\n        c: this.cMap(section)\n      });\n      this.notDiffusedProfile.concat({\n        x: _toConsumableArray(section.x),\n        c: this.cMap(section)\n      });\n      this.setNeumanCondition(\"center\");\n      var l = this.profile.getLength(\"x\");\n      this.temperature = _toConsumableArray(section.T).pop();\n      this.divNtau = parseInt(l * l); // 計算を早めるためのファクターをかけた場合\n      //this.divNtau=parseInt(l*l);\n\n      this.tau = 0;\n      this.step = 0;\n      return this;\n    }\n  }, {\n    key: \"setNeumanCondition\",\n    value: function setNeumanCondition(position) {\n      if ([\"center\", \"c\"].includes(position)) {\n        this.profile.direct(\"c\", 0, this.profile.pick(\"c\", 1));\n      } else {\n        throw new Error(\"invelid position argument\");\n      }\n    }\n    /*divideSpaceEqualy*/\n\n  }, {\n    key: \"divideSpaceEqually\",\n    value: function divideSpaceEqually(_divNum) {\n      this.profile.transformByEqualStep(_divNum, \"x\");\n      this.notDiffusedProfile.transformByEqualStep(_divNum, \"x\");\n      this.divNtau = _divNum * _divNum;\n      return this;\n    }\n    /* setCoolingPath */\n\n  }, {\n    key: \"setCoolingPath\",\n    value: function setCoolingPath(_temperatureSet, _realTime, _realRate) {\n      this.temperature = _temperatureSet;\n      this.realTime = _realTime;\n      this.coolingRate = _realRate <= 0 ? _realRate : -_realRate;\n      return this;\n    }\n    /* non dimensionalize */\n\n  }, {\n    key: \"nondimensionalize\",\n    value: function nondimensionalize() {\n      var _this = this;\n\n      //let ndprofile = this.ndprofile.get();\n      var profile = this.profile.get();\n      var l = profile.x.length;\n      this.xMax = Math.max.apply(Math, _toConsumableArray(profile.x));\n      /* ! 境界条件どうするか\r\n        * 現状では結晶境界の固相の組成で固定\r\n      */\n\n      this.cBound = profile.c[l - 1];\n      this.ndprofile.set({\n        x: profile.x.map(function (x) {\n          return x / _this.xMax;\n        }),\n        c: funcTools.zipWith(function (c, x) {\n          return c * x / (_this.xMax * _this.cBound);\n        })(profile.c)(profile.x)\n      });\n      this.ndprofile.direct(\"x\", 0, 0);\n      this.ndprofile.direct(\"c\", 0, 0);\n      /*\r\n      for (let i = 1; i < l; i = (i + 1) | 0) {\r\n        ndprofile.x[i] = profile.x[i] / this.xMax;\r\n        ndprofile.c[i] = profile.c[i] * ndprofile.x[i] / this.cBound;\r\n      };\r\n          ndprofile.x[0] = 0;\r\n      ndprofile.c[0] = 0;\r\n      */\n\n      return this;\n    }\n  }, {\n    key: \"redimensionalize\",\n\n    /* re dimensionalize */\n    value: function redimensionalize() {\n      var _this2 = this;\n\n      var ndprofile = this.ndprofile.get(); //let profile = this.profile;\n      //l = profile.x.length;\n\n      this.profile.set({\n        x: ndprofile.x.map(function (x) {\n          return x * _this2.xMax;\n        }),\n        c: funcTools.zipWith(function (c, x) {\n          return c / x * _this2.cBound;\n        })(ndprofile.c)(ndprofile.x)\n      });\n      this.profile.direct(\"x\", 0, 0);\n      this.profile.direct(\"c\", 0, this.profile.pick(\"c\", 1));\n      /*\r\n      for (let i = 1; i < l; i = (i + 1) | 0) {\r\n        profile.x[i] = ndprofile.x[i] * this.xMax;\r\n        profile.c[i] = ndprofile.c[i] * this.cBound / ndprofile.x[i];\r\n      };\r\n          profile.x[0] = 0;\r\n      profile.c[0] = profile.c[1];\r\n      */\n\n      return this;\n    }\n  }, {\n    key: \"getMaxCompressedTime\",\n\n    /* Compressed time */\n    value: function getMaxCompressedTime() {\n      var _divN = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 8196;\n\n      var temperature = this.temperature;\n      var timeSection = [0, this.realTime];\n      var coolingRate = this.coolingRate;\n      var E = this.coefficient.E;\n      var R = 8.3145;\n      var divNtau = this.divNtau;\n      var divNint = _divN;\n      var dt = (timeSection[1] - timeSection[0]) / divNint;\n      var eps = 1e-6;\n      var tMax = 0;\n      var time = timeSection[0];\n      var a = -E / R;\n      var tempIni = temperature[0] > temperature[1] ? temperature[0] : temperature[1];\n      var path = [];\n\n      for (var i = 0; i < divNint; i = i + 1 | 0) {\n        var temp = tempIni + coolingRate * time;\n        if (temp < 0) temp = 0.001;\n        var dtMax = Math.exp(a * (1 / temp - 1 / tempIni));\n        tMax = tMax + dtMax * dt;\n        path.push({\n          't': time,\n          'T': temp,\n          'Boltzman': dtMax,\n          'tau': tMax\n        });\n        time = time + dt;\n      }\n\n      ;\n      return path;\n    }\n  }, {\n    key: \"calcMaxCompressedTime\",\n\n    /* calcMaxCompressedTime */\n    value: function calcMaxCompressedTime() {\n      var _divN = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 8196;\n\n      var temperature = this.temperature;\n      var timeSection = [0, this.realTime];\n      var coolingRate = this.coolingRate;\n      var E = this.coefficient.E;\n      var R = 8.3145;\n      var divNtau = this.divNtau;\n      var divNint = _divN;\n      var dt = (timeSection[1] - timeSection[0]) / divNint;\n      var eps = 1e-6;\n      var tMax = 0;\n      var time = timeSection[0];\n      var a = -E / R;\n      var tempIni = temperature[0] > temperature[1] ? temperature[1] : temperature[0];\n\n      for (var i = 0; i < divNint; i = i + 1 | 0) {\n        var temp = tempIni + coolingRate * time;\n        if (temp < 0) break;\n        var dtMax = Math.exp(a * (1 / temp - 1 / tempIni));\n\n        if (dtMax < eps) {\n          break;\n        }\n\n        tMax = tMax + dtMax * dt;\n        time = time + dt;\n      }\n\n      ; //console.log(\"dtMax=\"+dtMax+\" time=\"+time)\n\n      this.compressedTime = tMax; //console.log(this.compressedTime)\n\n      this.dtau = 1 / divNtau;\n      return this;\n    }\n  }, {\n    key: \"setMaxCompressedTime\",\n    value: function setMaxCompressedTime(_logTime) {\n      this.compressedTime = Math.pow(10, _logTime);\n      return this;\n    }\n    /* クランク-ニコルソン\r\n      ~2017/7/3\r\n      分化前のメルト温度を基準として元素拡散を計算している\r\n        2017/7/4～\r\n      分化後のメルト温度を基準として元素拡散を計算している\r\n      this.temperature = [\r\n        initial hydrous temperature,\r\n        final hydrous temperature\r\n      ]\r\n    */\n\n  }, {\n    key: \"implicitCN\",\n    value: function implicitCN() {\n      var d0 = this.coefficient.d0,\n          E = this.coefficient.E,\n          R = 8.1345,\n          temperature = this.temperature,\n          d = d0 * Math.exp(-E / (R * temperature)),\n          // considering liquidus drop for hydrous melt\n      k = this.compressedTime * d / (this.xMax * this.xMax);\n\n      var _this$ndprofile$get = this.ndprofile.get(),\n          x = _this$ndprofile$get.x,\n          c = _this$ndprofile$get.c;\n\n      var N = x.length;\n\n      if (this.compressedTime < 1e10) {\n        var divNtau = 10;\n      } else if (this.compressedTime < 1e11) {\n        divNtau = 50;\n      } else if (this.compressedTime < 1e12) {\n        divNtau = 100;\n      } else if (this.compressedTime < 1e13) {\n        divNtau = 500;\n      } else if (this.compressedTime < 1e14) {\n        divNtau = 1000;\n      } else {\n        divNtau = 5000;\n      }\n\n      var dtau = 1 / divNtau;\n      var y = [],\n          l = [],\n          c2 = [],\n          c1 = [],\n          dx = x[1] - x[0],\n          // 空間差分がここでは一定が前提\n      p = k * dtau / (dx * dx);\n\n      for (var t = 0; t < divNtau; t++) {\n        //c1[0]=c0[1];\n        c[0] = 0;\n        c1[0] = 0;\n        c1[N - 1] = 1; //c2[1]=(2-2*p)*c[1]+p*c[2]+p*(c1[0]+c[0]);\n\n        c2[1] = (2 - 2 * p) * c[1] + p * c[2] + p * (c1[0] + c[0]);\n        c2[N - 1] = p * c[N - 2] + (2 - 2 * p) * c[N - 1] + p * (c1[N - 1] + c[N - 1]);\n        l[1] = 2 + 2 * p;\n        y[1] = c2[1] / l[1];\n\n        for (var i = 2; i < N - 1; i = i + 1 | 0) {\n          c2[i] = p * (c[i - 1] + c[i + 1]) + (2 - 2 * p) * c[i];\n          l[i] = 2 + 2 * p - p * p / l[i - 1];\n          y[i] = (c2[i] + p * y[i - 1]) / l[i];\n        } //l[N-1]=2+2*p-p*p/l[N-2];\n        //y[N-1]=(c2[N-1]+p*y[N-2])/l[N-1];\n\n\n        for (var _i = N - 2; _i > 0; _i = _i - 1 | 0) {\n          c1[_i] = y[_i] + p * c1[_i + 1] / l[_i];\n        }\n\n        c = [].concat(c1);\n        this.step = this.step + 1 | 0;\n      }\n\n      this.ndprofile.set({\n        c: c1\n      });\n      return this;\n    }\n    /** implicitCN draft\r\n     * 外界とのマスバランスを考慮し,クランク-ニコルソン法で拡散方程式を解く\r\n     * 球対称\r\n     */\n\n  }, {\n    key: \"implicitCNdraft\",\n    value: function implicitCNdraft() {\n      var d0 = this.coefficient.d0,\n          E = this.coefficient.E,\n          R = 8.1345,\n          temperature = this.temperature,\n          d = d0 * Math.exp(-E / (R * temperature)),\n          // considering liquidus drop for hydrous melt\n      k = this.compressedTime * d / (this.xMax * this.xMax);\n\n      var _this$ndprofile$get2 = this.ndprofile.get(),\n          x = _this$ndprofile$get2.x,\n          c = _this$ndprofile$get2.c;\n\n      var N = x.length;\n\n      if (this.compressedTime < 1e10) {\n        var divNtau = 10;\n      } else if (this.compressedTime < 1e11) {\n        divNtau = 50;\n      } else if (this.compressedTime < 1e12) {\n        divNtau = 100;\n      } else if (this.compressedTime < 1e13) {\n        divNtau = 500;\n      } else if (this.compressedTime < 1e14) {\n        divNtau = 1000;\n      } else {\n        divNtau = 5000;\n      }\n\n      var dtau = 1 / divNtau;\n      var y = [],\n          l = [],\n          c2 = [],\n          c1 = [],\n          dx = x[1] - x[0],\n          // 空間差分がここでは一定が前提\n      p = k * dtau / (dx * dx);\n\n      for (var t = 0; t < divNtau; t++) {\n        //c1[0]=c0[1];\n        c[0] = 0;\n        c1[0] = 0;\n        c1[N - 1] = 1; //c2[1]=(2-2*p)*c[1]+p*c[2]+p*(c1[0]+c[0]);\n\n        c2[1] = (2 - 2 * p) * c[1] + p * c[2] + p * (c1[0] + c[0]);\n        c2[N - 1] = p * c[N - 2] + (2 - 2 * p) * c[N - 1] + p * (c1[N - 1] + c[N - 1]);\n        l[1] = 2 + 2 * p;\n        y[1] = c2[1] / l[1];\n\n        for (var i = 2; i < N - 1; i = i + 1 | 0) {\n          c2[i] = p * (c[i - 1] + c[i + 1]) + (2 - 2 * p) * c[i];\n          l[i] = 2 + 2 * p - p * p / l[i - 1];\n          y[i] = (c2[i] + p * y[i - 1]) / l[i];\n        } //l[N-1]=2+2*p-p*p/l[N-2];\n        //y[N-1]=(c2[N-1]+p*y[N-2])/l[N-1];\n\n        /*\r\n        for (let i = N - 2; i > 0; i = (i - 1) | 0) {\r\n          c1[i] = y[i] + p * c1[i + 1] / l[i];\r\n        }\r\n        */\n\n\n        for (var _i2 = N - 2; _i2 > 0; _i2 = _i2 - 1 | 0) {\n          c1[_i2] = y[_i2] + p * c1[_i2 + 1] / l[_i2]; // 物質の質量(濃度 * 球殻体積)\n\n          averageCompo += (c1[_i2] - c - [_i2]) * (x[_i2 + 1] - x[_i2]) * (x[_i2 + 1] * x[_i2 + 1] + x[_i2 + 1] * x[_i2] + x[_i2] * x[_i2]);\n        }\n\n        c = (_readOnlyError(\"c\"), c1.map(function (v) {\n          return v;\n        }));\n        this.step = this.step + 1 | 0;\n      }\n\n      this.ndprofile.set({\n        c: c1\n      });\n      return this;\n    }\n  }], [{\n    key: \"getD\",\n    value: function getD(D, phase, component) {\n      return {\n        d0: D[phase][component].d0,\n        E: D[phase][component].E\n      };\n    }\n  }]);\n\n  return Diffusion;\n}();\n/* calcDiffusionAll\r\n  * 陽解法によって計算する\r\n*/\n\n/*\r\ncalcDiffusionAll() {\r\n  let d0 = this.coefficient.d0;\r\n  let E = this.coefficient.E;\r\n  let R = 8.1345;\r\n  let temperature = this.temperature;\r\n  let d = d0 * Math.exp(-E / R / temperature);\r\n  let k = this.compressedTime * d / (this.xMax * this.xMax);\r\n  let c0 = this.ndprofile.c.map((v) => v);\r\n  let x = this.ndprofile.x;\r\n  let c1 = new Array();\r\n  let l = c0.length;\r\n\r\n\r\n  this.divNtau = parseInt(k * 2 * l * l);\r\n  this.dtau = 1 / this.divNtau;\r\n  let dtau = this.dtau;\r\n\r\n  for (let j = 0; j < this.divNtau; j = (j + 1) | 0) {\r\n    c1[0] = 0;\r\n    c1[l - 1] = c0[l - 1];\r\n    for (let i = 1; i < l - 1; i = (i + 1) | 0) {\r\n      c1[i] = c0[i] + dtau * k * ((c0[i + 1] - c0[i]) / (x[i + 1] - x[i]) - (c0[i] - c0[i - 1]) / (x[i] - x[i - 1]));\r\n      let stablity = dtau * k / ((x[i + 1] - x[i]) * (x[i] - x[i - 1]));\r\n    };\r\n    c0 = c1.map((v) => v);\r\n    this.tau = this.tau + dtau;\r\n    this.step = (this.step + 1) | 0;\r\n    //if (this.tau >= this.compressedTime) return this;\r\n  }\r\n  this.ndprofile.c = c1.map((v) => v);\r\n  return this;\r\n};\r\n\r\ncalcDiffusionEachStep() {\r\n  let d0 = this.coefficient.d0;\r\n  let E = this.coefficient.E;\r\n  let R = 8.1345;\r\n  let temperature = this.temperature;\r\n  let d = d0 * Math.exp(-E / R / temperature);\r\n  let k = this.compressedTime * d / (this.xMax * this.xMax);\r\n  let c0 = this.ndprofile.c;\r\n  let x = this.ndprofile.x;\r\n  let c1 = new Array();\r\n  let l = c0.length;\r\n  let dtau = this.dtau;\r\n\r\n\r\n  c1[0] = 0;\r\n  c1[l - 1] = c0[l - 1];\r\n  for (let i = 1; i < l - 1; i = (i + 1) | 0) {\r\n    c1[i] = c0[i] + dtau * k * ((c0[i + 1] - c0[i]) / (x[i + 1] - x[i]) - (c0[i] - c0[i - 1]) / (x[i] - x[i - 1]));\r\n  };\r\n  this.ndprofile.c = c1;\r\n  this.tau = this.tau + dtau;\r\n  this.step = (this.step + 1) | 0;\r\n  if (this.tau >= this.compressedTime) return this;\r\n\r\n  return this;\r\n};\r\n*/\n\n/* implicitDiffusion\r\n  陰解法による計算\r\n*/\n\n/*\r\n implicitDiffusion() {\r\n   let d0 = this.coefficient.d0;\r\n   let E = this.coefficient.E;\r\n   let R = 8.1345;\r\n   let temperature = this.temperature;\r\n   let d = d0 * Math.exp(-E / (R * temperature));\r\n   let k = this.compressedTime * d / (this.xMax * this.xMax);\r\n   let c0 = this.ndprofile.c.map((v) => v);\r\n   let x = this.ndprofile.x;\r\n   let c1 = new Array();\r\n   let N = c0.length;\r\n\r\n   let divNtau = 10\r\n   let dtau = 1 / divNtau;\r\n\r\n   let y = [];\r\n   let l = [];\r\n\r\n   let dx = x[1] - x[0];\r\n   let p = k * dtau / (dx * dx);\r\n\r\n   for (let t = 0; t < divNtau; t = (t + 1) | 0) {\r\n     c1[0] = c0[1];\r\n     c0[0] = c0[1];\r\n     c1[N - 1] = 1;\r\n\r\n     l[1] = 1 + 2 * p;\r\n     y[1] = c0[1] / l[1];\r\n\r\n     for (let i = 2; i < N - 1; i = (i + 1) | 0) {\r\n       l[i] = 1 + 2 * p - p * p / l[i - 1];\r\n       y[i] = (c0[i] + p * y[i - 1]) / l[i];\r\n     }\r\n\r\n     for (let i = N - 2; i > 0; i = (i - 1) | 0) {\r\n       c1[i] = y[i] + p * c1[i + 1] / l[i];\r\n     }\r\n\r\n     c0 = c1.map((v) => v);\r\n     this.step = (this.step + 1) | 0;\r\n   }\r\n   this.ndprofile.c = c1.map((v) => v);\r\n\r\n   return this;\r\n }\r\n */\n\n\nmodule.exports = Diffusion;\n\n//# sourceURL=webpack:///../diffusion/src/diffusion.js?");
+
+/***/ }),
+
+/***/ "../diffusion/src/inter-diffusion.js":
+/*!*******************************************!*\
+  !*** ../diffusion/src/inter-diffusion.js ***!
+  \*******************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("function _typeof(obj) { if (typeof Symbol === \"function\" && typeof Symbol.iterator === \"symbol\") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === \"function\" && obj.constructor === Symbol && obj !== Symbol.prototype ? \"symbol\" : typeof obj; }; } return _typeof(obj); }\n\nfunction _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError(\"Cannot call a class as a function\"); } }\n\nfunction _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === \"object\" || typeof call === \"function\")) { return call; } return _assertThisInitialized(self); }\n\nfunction _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\"); } return self; }\n\nfunction _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }\n\nfunction _inherits(subClass, superClass) { if (typeof superClass !== \"function\" && superClass !== null) { throw new TypeError(\"Super expression must either be null or a function\"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); if (superClass) _setPrototypeOf(subClass, superClass); }\n\nfunction _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }\n\nvar Diffusion = __webpack_require__(/*! ./diffusion */ \"../diffusion/src/diffusion.js\");\n\nvar GeoChem = __webpack_require__(/*! ../../phase/src/geochem */ \"../phase/src/geochem.js\");\n\nvar funcTools = __webpack_require__(/*! ../../jslib/funcTools */ \"../jslib/funcTools.js\");\n\nvar mv = GeoChem.getMolarValue();\n\nvar InterDiffusion =\n/*#__PURE__*/\nfunction (_Diffusion) {\n  _inherits(InterDiffusion, _Diffusion);\n\n  function InterDiffusion(upper, lower, coef) {\n    var _this;\n\n    var type = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : \"atom\";\n\n    _classCallCheck(this, InterDiffusion);\n\n    _this = _possibleConstructorReturn(this, _getPrototypeOf(InterDiffusion).call(this, coef));\n    _this.elem = [upper, lower];\n\n    _this.cMap = function (section) {\n      return funcTools.zipWith(function (u, l) {\n        return type === \"atom\" ? u / l * mv[lower] / mv[upper] : u / l;\n      })(section[upper])(section[lower]);\n    };\n\n    return _this;\n  }\n\n  return InterDiffusion;\n}(Diffusion);\n\n;\nmodule.exports = InterDiffusion;\n\n//# sourceURL=webpack:///../diffusion/src/inter-diffusion.js?");
+
+/***/ }),
+
+/***/ "../diffusion/src/self-diffusion.js":
+/*!******************************************!*\
+  !*** ../diffusion/src/self-diffusion.js ***!
+  \******************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("function _typeof(obj) { if (typeof Symbol === \"function\" && typeof Symbol.iterator === \"symbol\") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === \"function\" && obj.constructor === Symbol && obj !== Symbol.prototype ? \"symbol\" : typeof obj; }; } return _typeof(obj); }\n\nfunction _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError(\"Cannot call a class as a function\"); } }\n\nfunction _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === \"object\" || typeof call === \"function\")) { return call; } return _assertThisInitialized(self); }\n\nfunction _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\"); } return self; }\n\nfunction _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }\n\nfunction _inherits(subClass, superClass) { if (typeof superClass !== \"function\" && superClass !== null) { throw new TypeError(\"Super expression must either be null or a function\"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); if (superClass) _setPrototypeOf(subClass, superClass); }\n\nfunction _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }\n\nvar Diffusion = __webpack_require__(/*! ./diffusion */ \"../diffusion/src/diffusion.js\");\n\nvar GeoChem = __webpack_require__(/*! ../../phase/src/geochem */ \"../phase/src/geochem.js\");\n\nvar mv = GeoChem.getMolarValue();\n\nvar SelfDiffusion =\n/*#__PURE__*/\nfunction (_Diffusion) {\n  _inherits(SelfDiffusion, _Diffusion);\n\n  function SelfDiffusion(elem, coef) {\n    var _this;\n\n    var type = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : \"\";\n\n    _classCallCheck(this, SelfDiffusion);\n\n    _this = _possibleConstructorReturn(this, _getPrototypeOf(SelfDiffusion).call(this, coef));\n    _this.elem = [elem];\n\n    _this.cMap = function (section) {\n      return section[elem].map(function (c) {\n        return type === \"atom\" ? c / mv[elem] : c;\n      });\n    };\n\n    return _this;\n  }\n\n  return SelfDiffusion;\n}(Diffusion);\n\n;\nmodule.exports = SelfDiffusion;\n\n//# sourceURL=webpack:///../diffusion/src/self-diffusion.js?");
+
+/***/ }),
+
+/***/ "../jslib/funcTools.js":
+/*!*****************************!*\
+  !*** ../jslib/funcTools.js ***!
+  \*****************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }\n\nfunction _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest(); }\n\nfunction _nonIterableRest() { throw new TypeError(\"Invalid attempt to destructure non-iterable instance\"); }\n\nfunction _iterableToArrayLimit(arr, i) { if (!(Symbol.iterator in Object(arr) || Object.prototype.toString.call(arr) === \"[object Arguments]\")) { return; } var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i[\"return\"] != null) _i[\"return\"](); } finally { if (_d) throw _e; } } return _arr; }\n\nfunction _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }\n\nfunction _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread(); }\n\nfunction _nonIterableSpread() { throw new TypeError(\"Invalid attempt to spread non-iterable instance\"); }\n\nfunction _iterableToArray(iter) { if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === \"[object Arguments]\") return Array.from(iter); }\n\nfunction _arrayWithoutHoles(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } }\n\nfunction _typeof(obj) { if (typeof Symbol === \"function\" && typeof Symbol.iterator === \"symbol\") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === \"function\" && obj.constructor === Symbol && obj !== Symbol.prototype ? \"symbol\" : typeof obj; }; } return _typeof(obj); }\n\n(function (root, factory) {\n  if (true) {\n    !(__WEBPACK_AMD_DEFINE_ARRAY__ = [], __WEBPACK_AMD_DEFINE_FACTORY__ = (factory),\n\t\t\t\t__WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ?\n\t\t\t\t(__WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__)) : __WEBPACK_AMD_DEFINE_FACTORY__),\n\t\t\t\t__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));\n  } else {}\n})(this, function () {\n  var Y = function Y(f) {\n    return function (x) {\n      return f(function (y) {\n        return x(x)(y);\n      });\n    }(function (x) {\n      return f(function (y) {\n        return x(x)(y);\n      });\n    });\n  };\n\n  var recursive = function recursive(base) {\n    return function (a) {\n      return function (n) {\n        return base(n, a);\n      };\n    };\n  };\n\n  var recursiveExtender = function recursiveExtender(custom) {\n    return function (templateFunc) {\n      return function (f) {\n        return templateFunc(custom(f));\n      };\n    };\n  };\n\n  var memoize = function memoize(cache) {\n    return function (f) {\n      return function (arg) {\n        if (!(arg in cache)) {\n          cache[arg] = f(arg);\n        }\n\n        return cache[arg];\n      };\n    };\n  };\n\n  var trace = function trace(f) {\n    return function (arg) {\n      console.log(\"called with argument \".concat(arg));\n      return f(arg);\n    };\n  };\n\n  var compose = function compose() {\n    for (var _len = arguments.length, fs = new Array(_len), _key = 0; _key < _len; _key++) {\n      fs[_key] = arguments[_key];\n    }\n\n    return function (x) {\n      return fs.reduceRight(function (acc, f) {\n        return f(acc);\n      }, x);\n    };\n  };\n\n  var pip = function pip() {\n    for (var _len2 = arguments.length, fs = new Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {\n      fs[_key2] = arguments[_key2];\n    }\n\n    return function (x) {\n      return fs.reduce(function (acc, f) {\n        return f(acc);\n      }, x);\n    };\n  };\n\n  var G = {\n    take: function take(n) {\n      return (\n        /*#__PURE__*/\n        regeneratorRuntime.mark(function _callee(g) {\n          var i, x;\n          return regeneratorRuntime.wrap(function _callee$(_context) {\n            while (1) {\n              switch (_context.prev = _context.next) {\n                case 0:\n                  i = 0;\n\n                case 1:\n                  if (!(i < n)) {\n                    _context.next = 10;\n                    break;\n                  }\n\n                  x = g.next();\n\n                  if (!x.done) {\n                    _context.next = 5;\n                    break;\n                  }\n\n                  return _context.abrupt(\"return\");\n\n                case 5:\n                  _context.next = 7;\n                  return x.value;\n\n                case 7:\n                  i++;\n                  _context.next = 1;\n                  break;\n\n                case 10:\n                case \"end\":\n                  return _context.stop();\n              }\n            }\n          }, _callee);\n        })\n      );\n    },\n    nest: function nest(f) {\n      return (\n        /*#__PURE__*/\n        regeneratorRuntime.mark(function _callee2(x) {\n          var y;\n          return regeneratorRuntime.wrap(function _callee2$(_context2) {\n            while (1) {\n              switch (_context2.prev = _context2.next) {\n                case 0:\n                  y = x;\n\n                case 1:\n                  if (false) {}\n\n                  _context2.next = 4;\n                  return y;\n\n                case 4:\n                  y = f(y);\n                  _context2.next = 1;\n                  break;\n\n                case 7:\n                case \"end\":\n                  return _context2.stop();\n              }\n            }\n          }, _callee2);\n        })\n      );\n    }\n  };\n\n  var take = function take(n) {\n    return _toConsumableArray(Array(n));\n  };\n\n  var fold = function fold(f) {\n    return function (x) {\n      return function (acc, e) {\n        return acc.length === 0 ? [f(x, e)] : [].concat(_toConsumableArray(acc), [f(acc[acc.length - 1], e)]);\n      };\n    };\n  };\n\n  var range = function range(ini, fin) {\n    var step = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;\n    return _toConsumableArray(Array(Math.ceil((fin - ini) / step))).map(function (_, i) {\n      return ini + step * i;\n    });\n  };\n\n  var spread = function spread() {\n    for (var _len3 = arguments.length, objs = new Array(_len3), _key3 = 0; _key3 < _len3; _key3++) {\n      objs[_key3] = arguments[_key3];\n    }\n\n    return [].concat(objs).reduce(function (a, b) {\n      return Object.assign(a, b);\n    }, {});\n  };\n\n  var transduce = function (compose) {\n    var mapping = function mapping(f) {\n      return function (reducer) {\n        return function (acc, e) {\n          return reducer(acc, f(e));\n        };\n      };\n    };\n\n    var filtering = function filtering(f) {\n      return function (reducer) {\n        return function (acc, e) {\n          return !f(e) ? acc : reducer(acc, e);\n        };\n      };\n    };\n\n    var folding = function folding(f) {\n      return function (x) {\n        return function (reducer) {\n          return function (acc, e) {\n            return acc.length === 0 ? reducer(acc, f(x, e)) : reducer(acc, f(acc[acc.length - 1], e));\n          };\n        };\n      };\n    };\n\n    var taking = function taking(n) {\n      return function (reducer) {\n        return function (acc, e) {\n          return acc.length < n ? reducer(acc, e) : reducer(acc, undefined);\n        };\n      };\n    };\n\n    var concatReducer = function concatReducer(acc, e) {\n      return e || e === 0 ? [].concat(_toConsumableArray(acc), [e]) : _toConsumableArray(acc);\n    };\n\n    var _intoArray = function _intoArray(ts) {\n      return function (xs) {\n        return xs.reduce(ts(concatReducer), []);\n      };\n    };\n\n    var intoArray = function intoArray() {\n      for (var _len4 = arguments.length, fs = new Array(_len4), _key4 = 0; _key4 < _len4; _key4++) {\n        fs[_key4] = arguments[_key4];\n      }\n\n      return function (xs) {\n        return xs.reduce(compose.apply(void 0, fs)(concatReducer), []);\n      };\n    };\n\n    return {\n      mapping: mapping,\n      filtering: filtering,\n      folding: folding,\n      taking: taking,\n      intoArray: intoArray,\n      _intoArray: _intoArray\n    };\n  }(compose);\n\n  var statefullTransducer = function (_ref, compose) {\n    var mapping = _ref.mapping,\n        filtering = _ref.filtering;\n\n    var indexing = function indexing(ini) {\n      return mapping(function (e) {\n        return [ini++, e];\n      });\n    };\n\n    var slicing = function slicing(m, n) {\n      return compose(indexing(0), filtering(function (_ref2) {\n        var _ref3 = _slicedToArray(_ref2, 2),\n            i = _ref3[0],\n            e = _ref3[1];\n\n        return m <= i && i < n;\n      }), mapping(function (_ref4) {\n        var _ref5 = _slicedToArray(_ref4, 2),\n            i = _ref5[0],\n            e = _ref5[1];\n\n        return e;\n      }));\n    };\n\n    return {\n      indexing: indexing,\n      slicing: slicing\n    };\n  }(transduce, compose);\n\n  var zipWith = function zipWith(f) {\n    return function (xs) {\n      return function (ys) {\n        return xs.length < ys.length ? xs.map(function (e, i) {\n          return f(e, ys[i]);\n        }) : ys.map(function (e, i) {\n          return f(xs[i], e);\n        });\n      };\n    };\n  };\n\n  var zip = function zip(xs) {\n    return function (ys) {\n      return xs.length < ys.length ? xs.map(function (e, i) {\n        return [e, ys[i]];\n      }) : ys.map(function (e, i) {\n        return [xs[i], e];\n      });\n    };\n  };\n\n  var zips = function zips() {\n    for (var _len5 = arguments.length, arr = new Array(_len5), _key5 = 0; _key5 < _len5; _key5++) {\n      arr[_key5] = arguments[_key5];\n    }\n\n    return transduce._intoArray(transduce.mapping(function (i) {\n      return arr.map(function (a) {\n        return a[i];\n      });\n    }))(range(0, Math.min.apply(Math, _toConsumableArray(arr.map(function (a) {\n      return a.length;\n    })))));\n  };\n\n  var Dataframe = function (_ref6, zips, spread) {\n    var intoArray = _ref6.intoArray,\n        mapping = _ref6.mapping,\n        _intoArray = _ref6._intoArray;\n\n    var toDataframe = function toDataframe(entries) {\n      //console.log(entries);\n      var keys = Object.keys(entries[0]);\n      return spread.apply(void 0, _toConsumableArray(keys.map(function (k) {\n        return _defineProperty({}, k, _intoArray(mapping(function (e) {\n          return e[k];\n        }))(entries));\n      })));\n    };\n\n    var toEntries = function toEntries(df) {\n      var keys = Object.keys(df);\n      return _intoArray(mapping(function (values) {\n        return _intoArray(mapping(function (_ref8) {\n          var _ref9 = _slicedToArray(_ref8, 2),\n              k = _ref9[0],\n              v = _ref9[1];\n\n          return _defineProperty({}, k, v);\n        }))(zips(keys, values)).reduce(function (a, b) {\n          return Object.assign(a, b);\n        }, {});\n      }))(zips.apply(void 0, _toConsumableArray(Object.values(df))));\n    };\n\n    var _intoDataframe = function _intoDataframe(ts) {\n      return function (df) {\n        return toDataframe(_intoArray(ts)(toEntries(df)));\n      };\n    };\n\n    var intoDataframe = function intoDataframe() {\n      for (var _len6 = arguments.length, fs = new Array(_len6), _key6 = 0; _key6 < _len6; _key6++) {\n        fs[_key6] = arguments[_key6];\n      }\n\n      return function (df) {\n        return toDataframe(intoArray.apply(void 0, fs)(toEntries(df)));\n      };\n    };\n\n    var mapEntries = function mapEntries(f) {\n      return mapping(function (e) {\n        return Object.assign(e, f(e));\n      });\n    };\n\n    var table = function table(df) {\n      return console.table(toEntries(df));\n    };\n\n    return {\n      toDataframe: toDataframe,\n      intoDataframe: intoDataframe,\n      _intoDataframe: _intoDataframe,\n      mapEntries: mapEntries,\n      toEntries: toEntries,\n      table: table\n    };\n  }(transduce, zips, spread);\n\n  var tee = function tee(f) {\n    return function (a) {\n      f(a);\n      return a;\n    };\n  };\n\n  return {\n    Y: Y,\n    recursive: recursive,\n    recursiveExtender: recursiveExtender,\n    memoize: memoize,\n    trace: trace,\n    compose: compose,\n    pip: pip,\n    G: G,\n    zipWith: zipWith,\n    zip: zip,\n    zips: zips,\n    fold: fold,\n    range: range,\n    spread: spread,\n    take: take,\n    transduce: transduce,\n    statefullTransducer: statefullTransducer,\n    Dataframe: Dataframe,\n    tee: tee\n  };\n});\n\n//# sourceURL=webpack:///../jslib/funcTools.js?");
+
+/***/ }),
+
+/***/ "../phase/src/chemical_profile.js":
+/*!****************************************!*\
+  !*** ../phase/src/chemical_profile.js ***!
+  \****************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("function _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread(); }\n\nfunction _nonIterableSpread() { throw new TypeError(\"Invalid attempt to spread non-iterable instance\"); }\n\nfunction _iterableToArray(iter) { if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === \"[object Arguments]\") return Array.from(iter); }\n\nfunction _arrayWithoutHoles(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } }\n\nfunction _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest(); }\n\nfunction _nonIterableRest() { throw new TypeError(\"Invalid attempt to destructure non-iterable instance\"); }\n\nfunction _iterableToArrayLimit(arr, i) { if (!(Symbol.iterator in Object(arr) || Object.prototype.toString.call(arr) === \"[object Arguments]\")) { return; } var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i[\"return\"] != null) _i[\"return\"](); } finally { if (_d) throw _e; } } return _arr; }\n\nfunction _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }\n\nfunction _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError(\"Cannot call a class as a function\"); } }\n\nfunction _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if (\"value\" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }\n\nfunction _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }\n\n/** ChemicalProfile\r\n *  profile:{\r\n *  x:[],\r\n *  SiO2:[],\r\n *  ...\r\n * }\r\n */\nvar ChemicalProfile =\n/*#__PURE__*/\nfunction () {\n  function ChemicalProfile(propList) {\n    _classCallCheck(this, ChemicalProfile);\n\n    this.profile = ChemicalProfile.initialize(propList);\n  }\n\n  _createClass(ChemicalProfile, [{\n    key: \"reset\",\n    value: function reset(propList) {\n      this.profile = ChemicalProfile.initialize(propList);\n    }\n  }, {\n    key: \"push\",\n    value: function push(objs) {\n      var _this = this;\n\n      var objectArray = Array.isArray(objs) ? objs : [objs];\n      objectArray.forEach(function (obj) {\n        Object.entries(obj).forEach(function (kv) {\n          var k = kv[0],\n              v = kv[1];\n\n          _this.profile[k].push(v);\n        });\n      });\n    }\n  }, {\n    key: \"concat\",\n    value: function concat(objs) {\n      var _this2 = this;\n\n      var objectArray = Array.isArray(objs) ? objs : [objs];\n      objectArray.forEach(function (obj) {\n        Object.entries(obj).forEach(function (_ref) {\n          var _ref2 = _slicedToArray(_ref, 2),\n              k = _ref2[0],\n              v = _ref2[1];\n\n          _this2.profile[k] = [].concat(_toConsumableArray(_this2.profile[k]), _toConsumableArray(v));\n        });\n      });\n    }\n  }, {\n    key: \"pop\",\n    value: function pop() {\n      var obj = {};\n      Object.entries(this.profile).forEach(function (kv) {\n        var k = kv[0],\n            v = kv[1];\n        obj[k] = v.pop();\n      });\n      return obj;\n    }\n  }, {\n    key: \"get\",\n    value: function get() {\n      var _this3 = this;\n\n      var _keys = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];\n\n      var obj = {};\n      var keys = Array.isArray(_keys) ? _keys : [_keys];\n\n      if (keys.length === 0) {\n        obj = JSON.parse(JSON.stringify(this.profile));\n      } else {\n        keys.forEach(function (k) {\n          obj[k] = JSON.parse(JSON.stringify(_this3.profile[k]));\n        });\n      }\n\n      return obj;\n    }\n  }, {\n    key: \"set\",\n    value: function set(opt) {\n      var _this4 = this;\n\n      Object.entries(opt).forEach(function (_ref3) {\n        var _ref4 = _slicedToArray(_ref3, 2),\n            k = _ref4[0],\n            array = _ref4[1];\n\n        _this4.profile[k] = array;\n      });\n    }\n  }, {\n    key: \"pick\",\n    value: function pick(k, i) {\n      return this.profile[k][i];\n    }\n  }, {\n    key: \"direct\",\n    value: function direct(k, i, v) {\n      this.profile[k][i] = v;\n    }\n  }, {\n    key: \"getLength\",\n    value: function getLength(k) {\n      return this.profile[k].length;\n    }\n  }, {\n    key: \"transformByEqualStep\",\n    value: function transformByEqualStep() {\n      var _divNum = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1;\n\n      var _prop = arguments.length > 1 ? arguments[1] : undefined;\n\n      var _profile = this.profile;\n      var divNum = parseInt(_divNum);\n      if (divNum < 1) throw new Error(\"divNum must positive\");\n      if (!_profile.hasOwnProperty(_prop)) throw new Error(\"profile does not have key [\".concat(_prop, \"]\"));\n      var l = _profile[_prop].length;\n      var dF = (_profile[_prop][l - 1] - _profile[_prop][0]) / divNum;\n      var newProfile = {};\n      var props = Object.keys(_profile);\n      props.forEach(function (k) {\n        newProfile[k] = [_profile[k][0]];\n      });\n      var F = _profile[_prop][0] + dF;\n      var k = 0;\n\n      for (var i = 1; i < divNum + 1; i++) {\n        while (F > _profile[_prop][k + 1]) {\n          if (k === l - 2) break;\n          k++;\n        }\n\n        var f = _profile[_prop][k + 1] - _profile[_prop][k] === 0 ? 0 : (F - _profile[_prop][k]) / (_profile[_prop][k + 1] - _profile[_prop][k]);\n        var _iteratorNormalCompletion = true;\n        var _didIteratorError = false;\n        var _iteratorError = undefined;\n\n        try {\n          for (var _iterator = props[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {\n            var prop = _step.value;\n            newProfile[prop][i] = _profile[prop][k] * (1 - f) + _profile[prop][k + 1] * f;\n          }\n        } catch (err) {\n          _didIteratorError = true;\n          _iteratorError = err;\n        } finally {\n          try {\n            if (!_iteratorNormalCompletion && _iterator[\"return\"] != null) {\n              _iterator[\"return\"]();\n            }\n          } finally {\n            if (_didIteratorError) {\n              throw _iteratorError;\n            }\n          }\n        }\n\n        F += dF;\n      }\n\n      this.profile = newProfile;\n    }\n  }, {\n    key: \"transformByRadius\",\n    value: function transformByRadius(positions) {\n      var x = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : \"x\";\n      if (positions.length < 1) throw new Error(\"Length of positions is 0\");\n      var profile = this.profile;\n      var props = Object.keys(profile).filter(function (v) {\n        return v !== x;\n      });\n      var profLen = profile[props[0]].length;\n      var posLen = positions.length;\n      var newProfile = {};\n      var _iteratorNormalCompletion2 = true;\n      var _didIteratorError2 = false;\n      var _iteratorError2 = undefined;\n\n      try {\n        for (var _iterator2 = props[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {\n          var _prop2 = _step2.value;\n          newProfile[_prop2] = [];\n        }\n      } catch (err) {\n        _didIteratorError2 = true;\n        _iteratorError2 = err;\n      } finally {\n        try {\n          if (!_iteratorNormalCompletion2 && _iterator2[\"return\"] != null) {\n            _iterator2[\"return\"]();\n          }\n        } finally {\n          if (_didIteratorError2) {\n            throw _iteratorError2;\n          }\n        }\n      }\n\n      var k = 0;\n\n      for (var i = 0; i < posLen; i++) {\n        while (positions[i] > profile[x][k + 1]) {\n          if (k === profLen - 2) break;\n          k++;\n        }\n\n        var f = profile[x][k + 1] - profile[x][k] === 0 ? 0 : (positions[i] - profile[x][k]) / (profile[x][k + 1] - profile[x][k]);\n        var _iteratorNormalCompletion3 = true;\n        var _didIteratorError3 = false;\n        var _iteratorError3 = undefined;\n\n        try {\n          for (var _iterator3 = props[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {\n            var prop = _step3.value;\n            newProfile[prop][i] = profile[prop][k] * (1 - f) + profile[prop][k + 1] * f;\n          }\n        } catch (err) {\n          _didIteratorError3 = true;\n          _iteratorError3 = err;\n        } finally {\n          try {\n            if (!_iteratorNormalCompletion3 && _iterator3[\"return\"] != null) {\n              _iterator3[\"return\"]();\n            }\n          } finally {\n            if (_didIteratorError3) {\n              throw _iteratorError3;\n            }\n          }\n        }\n      }\n\n      newProfile[x] = _toConsumableArray(positions);\n      this.profile = newProfile;\n    }\n    /** section Resampler */\n    // profile as argument should have property c,x,f(crystallization fraction)\n\n    /** transformSectionToEqualDivision */\n    // sampled point number is divideNum + 1\n    // F[0] ~ g(F[i-1], F[i]) ~ F[N]\n\n  }], [{\n    key: \"initialize\",\n    value: function initialize(propList) {\n      var profile = {};\n      propList.forEach(function (propName) {\n        if (Array.isArray(propName)) {\n          propName.forEach(function (p) {\n            profile[p] = [];\n          });\n        } else {\n          profile[propName] = [];\n        }\n      });\n      return profile;\n    }\n  }, {\n    key: \"transformSectionByEqualStep\",\n    value: function transformSectionByEqualStep(section) {\n      var _divideNum = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;\n\n      var prop = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : \"f\";\n      var divideNum = parseInt(_divideNum);\n      if (divideNum < 1) throw new Error(\"divideNum must be positive\");\n      var newProfile = [];\n      var keys = Object.keys(sectionObj);\n\n      for (var _i2 = 0, _keys2 = keys; _i2 < _keys2.length; _i2++) {\n        key = _keys2[_i2];\n\n        if (!sectionObj[key][_prop]) {\n          newProfile[key] = sectionObj[key];\n          continue;\n        } //if(sectionObj[key].f.length < 2) return sectionObj;\n\n\n        var profile = sectionObj[key];\n        var l = profile[_prop].length;\n        var extent = {\n          'max': profile[_prop][l - 1],\n          'min': profile[_prop][0]\n        };\n        newProfile[key] = {\n          'name': key,\n          'f': [],\n          'c': [],\n          'x': []\n        };\n        newProfile[key].f[0] = profile.f[0];\n        newProfile[key].c[0] = profile.c[0];\n        var dF = (extent.max - extent.min) / divideNum;\n        var F = profile[_prop][0] + dF;\n        var k = 0;\n\n        for (var i = 1; i < divideNum + 1; i = i + 1 | 0) {\n          while (F > profile[_prop][k + 1]) {\n            if (k == l - 2) break;\n            k = k + 1 | 0;\n          }\n\n          var factor = (F - profile[_prop][k]) / (profile[_prop][k + 1] - profile[_prop][k]);\n          newProfile[key].f[i] = F;\n          newProfile[key].c[i] = profile.c[k] * (1 - factor) + profile.c[k + 1] * factor;\n          F += dF;\n        }\n      }\n\n      return newProfile;\n    }\n  }, {\n    key: \"formatProfile\",\n    value: function formatProfile(sectionObj) {\n      var newProfile = {};\n      var keys = Object.keys(sectionObj[0]);\n      keys.map(function (key) {\n        newProfile[key] = [];\n      });\n\n      var _loop = function _loop(i, l) {\n        keys.map(function (key) {\n          newProfile[key][i] = sectionObj[i][key];\n        });\n      };\n\n      for (var i = 0, l = sectionObj.length; i < l; i++) {\n        _loop(i, l);\n      }\n\n      return newProfile;\n    }\n  }]);\n\n  return ChemicalProfile;\n}();\n\nmodule.exports = ChemicalProfile;\n\n//# sourceURL=webpack:///../phase/src/chemical_profile.js?");
+
+/***/ }),
+
+/***/ "../phase/src/equilibrate.js":
+/*!***********************************!*\
+  !*** ../phase/src/equilibrate.js ***!
+  \***********************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError(\"Cannot call a class as a function\"); } }\n\nfunction _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if (\"value\" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }\n\nfunction _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }\n\nvar GeoChem = __webpack_require__(/*! ./geochem */ \"../phase/src/geochem.js\");\n\nvar Matrix = __webpack_require__(/*! ./matrix */ \"../phase/src/matrix.js\");\n\nvar Equilibrate =\n/*#__PURE__*/\nfunction () {\n  function Equilibrate() {\n    _classCallCheck(this, Equilibrate);\n  }\n  /**\n   *\n   * @param {Liquid} melt\n   * @param {Solid} opx\n   */\n\n\n  _createClass(Equilibrate, null, [{\n    key: \"opx_melt\",\n    value: function opx_melt(melt) {\n      var method = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : \"solve\";\n      var mv = GeoChem.getMolarValue();\n      return function (opx) {\n        return function (T, P) {\n          var A = [];\n          A[0] = [1, 1, 1, 1, 1, 1, 1, 1];\n          A[1] = [0, -1, opx.KD.Fe_Mg(T, P) * melt.major.FeO / melt.major.MgO, 0, 0, 0, 0, 0];\n          A[2] = [1 / mv.SiO2, -1 / mv.FeO, -1 / mv.MgO, 0, 0, 0, 0, 0];\n          A[3] = [0, 0, 0, 1, 0, 0, 0, 0];\n          A[4] = [0, 0, 0, 0, 1, 0, 0, 0];\n          A[5] = [0, 0, 0, 0, 0, 1, 0, 0];\n          A[6] = [0, 0, 0, 0, 0, 0, 1, 0];\n          A[7] = [0, 0, 0, 0, 0, 0, 0, 1];\n          var v = [100, 0, 0, opx.D.hasOwnProperty(\"TiO2\") ? melt.major.TiO2 * opx.D.TiO2(T, P) : 0, opx.D.hasOwnProperty(\"Al2O3\") ? melt.major.Al2O3 * opx.D.Al2O3(T, P) : 0, opx.D.hasOwnProperty(\"CaO\") ? melt.major.CaO * opx.D.CaO(T, P) : 0, opx.D.hasOwnProperty(\"Cr2O3\") ? melt.major.Cr2O3 * opx.D.Cr2O3(T, P) : 0, opx.D.hasOwnProperty(\"NiO\") ? melt.major.NiO * opx.D.NiO(T, P) : 0];\n          var x = Equilibrate[method](A, v);\n          var trace = {};\n\n          for (var e in melt.trace) {\n            trace[e] = opx.D.hasOwnProperty(e) ? melt.trace[e] * opx.D[e](T, P) : 0;\n          }\n\n          return {\n            major: {\n              SiO2: x[0],\n              FeO: x[1],\n              MgO: x[2],\n              TiO2: x[3],\n              Al2O3: x[4],\n              CaO: x[5],\n              Cr2O3: x[6],\n              NiO: x[7],\n              Fe2O3: 0,\n              Na2O: 0,\n              K2O: 0,\n              P2O5: 0,\n              MnO: 0,\n              H2O: 0\n            },\n            trace: trace\n          };\n        };\n      };\n    }\n  }, {\n    key: \"olivine_melt\",\n    value: function olivine_melt(melt) {\n      var method = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : \"solve\";\n      var mv = GeoChem.getMolarValue();\n      return function (olivine) {\n        return function (T, P) {\n          var A = [];\n          A[0] = [1, 1, 1, 1, 1, 1, 1, 1];\n          A[1] = [-melt.major.FeO / melt.major.MgO, 1 / olivine.KD.Fe_Mg(T, P), 0, 0, 0, 0, 0, 0];\n          A[2] = [-1 / mv.MgO, -1 / mv.FeO, 2. / mv.SiO2, 0, 0, 0, 0, 0];\n          A[3] = [0, 0, 0, 1, 0, 0, 0, 0];\n          A[4] = [0, 0, 0, 0, 1, 0, 0, 0];\n          A[5] = [0, 0, 0, 0, 0, 1, 0, 0];\n          A[6] = [0, 0, 0, 0, 0, 0, 1, 0];\n          A[7] = [0, 0, 0, 0, 0, 0, 0, 1];\n          var v = [100, 0, 0, olivine.D.hasOwnProperty(\"TiO2\") ? melt.major.TiO2 * olivine.D.TiO2(T, P) : 0, olivine.D.hasOwnProperty(\"Al2O3\") ? melt.major.Al2O3 * olivine.D.Al2O3(T, P) : 0, olivine.D.hasOwnProperty(\"CaO\") ? melt.major.CaO * olivine.D.CaO(T, P) : 0, olivine.D.hasOwnProperty(\"Cr2O3\") ? melt.major.Cr2O3 * olivine.D.Cr2O3(T, P) : 0, olivine.D.hasOwnProperty(\"NiO\") ? melt.major.NiO * olivine.D.NiO(T, P) : 0];\n          var x = Equilibrate[method](A, v, 1e-6, 0.9);\n          var trace = {};\n\n          for (var e in melt.trace) {\n            trace[e] = olivine.D.hasOwnProperty(e) ? melt.trace[e] * olivine.D[e](T, P) : 0;\n          }\n\n          return {\n            major: {\n              SiO2: x[2],\n              FeO: x[1],\n              MgO: x[0],\n              TiO2: x[3],\n              Al2O3: x[4],\n              CaO: x[5],\n              Cr2O3: x[6],\n              NiO: x[7],\n              Fe2O3: 0,\n              Na2O: 0,\n              K2O: 0,\n              P2O5: 0,\n              MnO: 0,\n              H2O: 0\n            },\n            trace: trace\n          };\n        };\n      };\n    }\n  }, {\n    key: \"spinel_melt\",\n    value: function spinel_melt(melt) {\n      var method = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : \"solve\";\n      var mv = GeoChem.getMolarValue();\n      return function (spinel) {\n        return function (T, P) {\n          var trace = {};\n\n          for (var e in melt.trace) {\n            trace[e] = spinel.D.hasOwnProperty(e) ? melt.trace[e] * spinel.D[e](T, P) : 0;\n          }\n\n          return {\n            major: {\n              SiO2: 0,\n              FeO: 0,\n              MgO: 0,\n              TiO2: 0,\n              Al2O3: 0,\n              CaO: 0,\n              Cr2O3: spinel.D.Cr2O3(T, P) * melt.major.Cr2O3,\n              NiO: spinel.D.NiO(T, P) * melt.major.NiO,\n              Fe2O3: 0,\n              Na2O: 0,\n              K2O: 0,\n              P2O5: 0,\n              MnO: 0,\n              H2O: 0\n            },\n            trace: trace\n          };\n        };\n      };\n    }\n  }, {\n    key: \"solve\",\n    value: function solve(_A, _v) {\n      var _eps = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1.0e-6;\n\n      var _w = arguments.length > 3 ? arguments[3] : undefined;\n\n      var A = new Matrix(_A);\n      var v = new Matrix(_v.map(function (a) {\n        return [a];\n      }));\n      var invA = Matrix.inverse(A, _eps);\n      var x = Matrix.multiple(invA, v);\n      return x.m.map(function (a) {\n        return a[0];\n      });\n    }\n  }, {\n    key: \"SOR\",\n    value: function SOR(A, v) {\n      var eps = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1e-6;\n      var w = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 1.;\n      var dX = 1;\n      var absX = 1;\n      var raw = A.length;\n      var col = A[0].length;\n      var x = v.map(function (v) {\n        return 0;\n      });\n      var k = 0;\n\n      while (dX / absX > eps) {\n        dX = 0;\n        absX = 0;\n\n        for (var i = 0; i < raw; i++) {\n          var sum = 0;\n\n          for (var j = 0; j < col; j++) {\n            if (i !== j) {\n              sum += A[i][j] * x[j];\n            }\n          }\n\n          var newX = 1. / A[i][i] * (v[i] - sum);\n          dX += Math.abs(newX - x[i]);\n          absX += Math.abs(newX);\n          x[i] += w * (newX - x[i]);\n          k++;\n        }\n      } //console.log(k++)\n\n\n      return x;\n    }\n  }]);\n\n  return Equilibrate;\n}();\n\nmodule.exports = Equilibrate;\n\n//# sourceURL=webpack:///../phase/src/equilibrate.js?");
+
+/***/ }),
+
+/***/ "../phase/src/exchangePartitioning.js":
+/*!********************************************!*\
+  !*** ../phase/src/exchangePartitioning.js ***!
+  \********************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("var olivine = {\n  Fe_Mg: {\n    Beattie1993: function Beattie1993(liquid) {\n      return function (T, P) {\n        return 0.303;\n      };\n    }\n  }\n};\nvar orthopyroxene = {\n  Fe_Mg: {\n    Beattie1993: function Beattie1993(liquid) {\n      return function (T, P) {\n        return 0.284;\n      };\n    }\n  }\n};\nvar spinel = {};\nmodule.exports = {\n  olivine: olivine,\n  orthopyroxene: orthopyroxene,\n  spinel: spinel\n};\n\n//# sourceURL=webpack:///../phase/src/exchangePartitioning.js?");
+
+/***/ }),
+
+/***/ "../phase/src/geochem.js":
+/*!*******************************!*\
+  !*** ../phase/src/geochem.js ***!
+  \*******************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError(\"Cannot call a class as a function\"); } }\n\nfunction _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if (\"value\" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }\n\nfunction _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }\n\n/* _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/ */\n\n/** class GeoChem\r\n * Provide calculation method for composition.\r\n */\nvar GeoChem =\n/*#__PURE__*/\nfunction () {\n  function GeoChem() {\n    _classCallCheck(this, GeoChem);\n  }\n\n  _createClass(GeoChem, null, [{\n    key: \"getCationNum\",\n    value: function getCationNum() {\n      return {\n        \"SiO2\": 1,\n        \"TiO2\": 1,\n        \"Al2O3\": 2,\n        \"FeO\": 1,\n        \"Fe2O3\": 2,\n        \"MgO\": 1,\n        \"CaO\": 1,\n        \"Na2O\": 2,\n        \"K2O\": 2,\n        \"P2O5\": 2,\n        \"MnO\": 2,\n        \"Cr2O3\": 2,\n        \"NiO\": 1,\n        \"H2O\": 2\n      };\n    }\n  }, {\n    key: \"getMolarValue\",\n    value: function getMolarValue() {\n      return {\n        SiO2: 60.06,\n        TiO2: 79.90,\n        Al2O3: 101.94,\n        FeO: 71.84,\n        MgO: 40.32,\n        Fe2O3: 159.69,\n        CaO: 56.08,\n        Na2O: 61.99,\n        K2O: 94.20,\n        P2O5: 141.94,\n        MnO: 70.94,\n        Cr2O3: 151.99,\n        NiO: 74.69,\n        H2O: 18\n      };\n    }\n  }, {\n    key: \"getMajorList\",\n    value: function getMajorList() {\n      return [\"SiO2\", \"TiO2\", \"Al2O3\", \"FeO\", \"Fe2O3\", \"MgO\", \"CaO\", \"Na2O\", \"K2O\", \"P2O5\", \"MnO\", \"Cr2O3\", \"NiO\", \"H2O\"];\n    }\n  }, {\n    key: \"getTraceList\",\n    value: function getTraceList() {\n      return [];\n    }\n  }]);\n\n  return GeoChem;\n}();\n\nmodule.exports = GeoChem;\n\n//# sourceURL=webpack:///../phase/src/geochem.js?");
+
+/***/ }),
+
+/***/ "../phase/src/geothermobarometer.js":
+/*!******************************************!*\
+  !*** ../phase/src/geothermobarometer.js ***!
+  \******************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("var thermometer = {\n  /** Sugawara (2000) equilibrium temperature of melt saturating olivine.\r\n  *\r\n  * Pressure should be given as unit of GPa.\r\n  *\r\n  * To use this method:\r\n  *\r\n  * T = thermometer.Sugawara2000.bind(liquid)(P);\r\n  *\r\n  * partial application:\r\n  *\r\n  * liquidT = thermometer.Sugawara2000.bind(liquid);\r\n  * T = liquidT(P);\r\n  *\r\n  * @param liquid[Liquid]: instance of Liquid\r\n  * @param P[Number]: pressure [GPa]\r\n  * @return [Number]: temperature [K]\r\n  */\n  Sugawara2000: function Sugawara2000(liquid) {\n    return function (P) {\n      var atom = liquid.atom;\n      var atomSum = liquid.getAtomSum(true, false) * 0.01;\n      var T = 1446 + (-1.44 * atom.SiO2 - 0.5 * atom.FeO + 12.32 * atom.MgO - 3.899 * atom.CaO) / atomSum;\n      return T + 0.0043 * P;\n    };\n  },\n\n  /** Mederd & Grove(2008) Liquidus drop by water (wt %)\r\n   * @param liquid[Liquid]: instance of Liquid\r\n   * @param H2O[Number]: water content [wt%]\r\n   * @return [Number]:temperature\r\n   */\n  liquidusDropMG2008: function liquidusDropMG2008(liquid) {\n    return function (H2O) {\n      var water = H2O === undefined ? liquid.major.H2O : H2O;\n      return water * (40.4 - water * (2.97 - water * 0.0761));\n    };\n  },\n\n  /** olivineSpinel thermometer\r\n  * @param olivine[Solid]: instance of Solid\r\n  * @param spinel[Solid]: instance of Solid\r\n  * @param P[Number]: pressure [GPa]\r\n  * @return [Number]: temperature [K]\r\n  */\n  olivineSpinelBs1991: function olivineSpinelBs1991(olivine, spinel) {\n    return function (P) {\n      var R = spinel.atom.Fe2O3 + spinel.atom.Al2O3 + spinel.atom.Cr2O3;\n      return ((13530 + 388 * P) * (1 - 2 * olivine.atom.FeO / (olivine.atom.FeO + olivine.atom.MgO)) - 1960 * (spinel.atom.MgO - spinel.atom.FeO) / (spinel.atom.FeO + spinel.atom.MgO) + 16150 * spinel.atom.Cr2O3 / R + 25150 * (spinel.atom.Fe2O3 / R)) / (8.3145 * Math.log(olivine.atom.MgO * spinel.atom.FeO / (olivine.atom.FeO * spinel.atom.MgO)) + 4.705);\n    };\n  }\n};\nvar barometer = {};\nvar oxybarometer = {\n  /** olivineSpinel oxygen fugacity\r\n  * Ballhaus et al. (1991)\r\n  * @param olivine[Solid]: instance of Solid\r\n  * @param spinel[Solid]: instance of Solid\r\n  * @param P[Number] : pressure [GPa]\r\n  * @param T[Number] : temperature [K]\r\n  * @return [Number]: divergence of logfO2 from FMQ buffer\r\n  */\n  olivineSpinelBs1991: function olivineSpinelBs1991(olivine, spinel) {\n    return function (T, P) {\n      var R = spinel.atom.Fe2O3 + spinel.atom.Al2O3 + spinel.atom.Cr2O3;\n      return 0.27 + 2505 / T - 400 * P / T - 6. * Math.log(olivine.atom.FeO) - 3200. * (1. - olivine.atom.FeO) * (1. - olivine.atom.FeO) / T + 2. * Math.log(spinel.atom.FeO) + 4. * Math.log(spinel.atom.Fe2O3 / R) + 2630. * (spinel.atom.Al2O3 * spinel.atom.Al2O3) / (R * R * T);\n    };\n  }\n};\nmodule.exports = {\n  thermometer: thermometer,\n  barometer: barometer,\n  oxybarometer: oxybarometer\n};\n\n//# sourceURL=webpack:///../phase/src/geothermobarometer.js?");
+
+/***/ }),
+
+/***/ "../phase/src/liquid.js":
+/*!******************************!*\
+  !*** ../phase/src/liquid.js ***!
+  \******************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("function _typeof(obj) { if (typeof Symbol === \"function\" && typeof Symbol.iterator === \"symbol\") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === \"function\" && obj.constructor === Symbol && obj !== Symbol.prototype ? \"symbol\" : typeof obj; }; } return _typeof(obj); }\n\nfunction _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError(\"Cannot call a class as a function\"); } }\n\nfunction _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if (\"value\" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }\n\nfunction _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }\n\nfunction _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === \"object\" || typeof call === \"function\")) { return call; } return _assertThisInitialized(self); }\n\nfunction _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\"); } return self; }\n\nfunction _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }\n\nfunction _inherits(subClass, superClass) { if (typeof superClass !== \"function\" && superClass !== null) { throw new TypeError(\"Super expression must either be null or a function\"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); if (superClass) _setPrototypeOf(subClass, superClass); }\n\nfunction _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }\n\nvar GeoChem = __webpack_require__(/*! ./geochem */ \"../phase/src/geochem.js\");\n\nvar Phase = __webpack_require__(/*! ./phase */ \"../phase/src/phase.js\");\n\nvar sum = function sum(a, b) {\n  return a + b;\n};\n\nvar Liquid =\n/*#__PURE__*/\nfunction (_Phase) {\n  _inherits(Liquid, _Phase);\n\n  function Liquid(name) {\n    var _this;\n\n    _classCallCheck(this, Liquid);\n\n    _this = _possibleConstructorReturn(this, _getPrototypeOf(Liquid).call(this, name));\n    _this.fFe2 = 1;\n    _this.outOfRange = false;\n    return _this;\n  }\n\n  _createClass(Liquid, [{\n    key: \"setH2O\",\n    value: function setH2O(waterContent) {\n      this.major.H2O = waterContent;\n      return this;\n    }\n  }, {\n    key: \"setFe2Ratio\",\n    value: function setFe2Ratio(Fe2Fraction) {\n      this.fFe2 = Fe2Fraction; // Fe2 / (Fe2 + Fe3);\n\n      return this;\n    }\n  }, {\n    key: \"compensateFe\",\n    value: function compensateFe() {\n      var exceptH2O = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : true;\n      this.compo2atom(exceptH2O, true).atom2compo();\n      return this;\n    }\n  }, {\n    key: \"compo2atom\",\n    value: function compo2atom() {\n      var _this2 = this;\n\n      var exceptH2O = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : true;\n      var normalize = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;\n      var molar = GeoChem.getMolarValue();\n      var major = this.major;\n      Object.entries(major).forEach(function (kv) {\n        var k = kv[0],\n            v = kv[1],\n            m = molar[k];\n        _this2.atom[k] = exceptH2O === true && k === \"H2O\" ? 0 : v / m;\n      });\n      var totalFe = this.atom.FeO + this.atom.Fe2O3 * 2;\n      this.atom.FeO = totalFe * this.fFe2;\n      this.atom.Fe2O3 = totalFe * (1 - this.fFe2) * 0.5;\n\n      if (normalize) {\n        var atomSum = this.getAtomSum(exceptH2O);\n        Object.keys(major).forEach(function (k) {\n          var v = _this2.atom[k];\n          _this2.atom[k] = exceptH2O === true && k === \"H2O\" ? 0 : v / atomSum;\n        });\n      }\n\n      return this;\n    }\n    /**\r\n     *\r\n     * @param {*} objs = [{\"phase\": Phase, \"f\":Number}]\r\n     * @param {*} massFraction\r\n     */\n\n  }, {\n    key: \"differentiate\",\n    value: function differentiate(objs, massFraction) {\n      var _this3 = this;\n\n      var self = this;\n      if (self.outOfRange) throw new Error(\"Composition out of range\");\n\n      var _loop = function _loop(prop) {\n        var component = objs.map(function (o) {\n          return o.phase.major[prop] * o.f;\n        }).reduce(sum, 0);\n        var candidate = (_this3.major[prop] + massFraction * component) / (1 + massFraction);\n\n        if (0 <= candidate && candidate <= 100) {\n          self.major[prop] = candidate;\n        } else {\n          self.outOfRange === true;\n        }\n      };\n\n      for (var prop in this.major) {\n        _loop(prop);\n      }\n\n      ;\n\n      var _loop2 = function _loop2(_prop) {\n        var component = objs.map(function (o) {\n          return o.phase.trace[_prop] * o.f;\n        }).reduce(sum, 0);\n        var candidate = (_this3.trace[_prop] + massFraction * component) / (1 + massFraction);\n\n        if (0 <= candidate && candidate <= 100000000) {\n          self.trace[_prop] = candidate;\n        } else {\n          self.outOfRange === true;\n        }\n      };\n\n      for (var _prop in this.trace) {\n        _loop2(_prop);\n      }\n\n      ;\n      return this;\n    }\n  }, {\n    key: \"startDifferentiate\",\n    value: function startDifferentiate() {\n      this.outOfRange = false;\n      return this;\n    }\n  }, {\n    key: \"desolve\",\n    value: function desolve(obj, massFraction) {\n      return this;\n    }\n  }], [{\n    key: \"isLiquid\",\n    value: function isLiquid(obj) {\n      return obj instanceof Liquid;\n    }\n  }]);\n\n  return Liquid;\n}(Phase);\n\nmodule.exports = Liquid;\n\n//# sourceURL=webpack:///../phase/src/liquid.js?");
+
+/***/ }),
+
+/***/ "../phase/src/magma-system.js":
+/*!************************************!*\
+  !*** ../phase/src/magma-system.js ***!
+  \************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError(\"Cannot call a class as a function\"); } }\n\nfunction _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if (\"value\" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }\n\nfunction _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }\n\nvar Solid = __webpack_require__(/*! ./solid */ \"../phase/src/solid.js\");\n\nvar Liquid = __webpack_require__(/*! ./liquid */ \"../phase/src/liquid.js\");\n\nvar Magma =\n/*#__PURE__*/\nfunction () {\n  function Magma(parameters) {\n    _classCallCheck(this, Magma);\n\n    this.phase = {};\n\n    this.model = function (parameters, magma) {\n      return null;\n    };\n\n    this.diffusionProfiles = {};\n    this.thermometer = {};\n    this.barometer = {};\n    this.oxybarometer = {};\n    this.actionFuncList = [function (magma, opt) {\n      return null;\n    }];\n\n    this.finalAction = function (magma, opt) {\n      return null;\n    };\n\n    this.thermodynamicProperties = {};\n    this.custom = {};\n  }\n\n  _createClass(Magma, [{\n    key: \"filterPhase\",\n    value: function filterPhase(func) {\n      var obj = {};\n      Object.entries(this.phase).filter(function (kv) {\n        return func(kv[1]);\n      }).map(function (kv) {\n        obj[kv[0]] = kv[1];\n      });\n      return obj;\n    }\n  }, {\n    key: \"liquids\",\n    value: function liquids() {\n      return this.filterPhase(function (p) {\n        return p instanceof Liquid;\n      });\n    }\n  }, {\n    key: \"solids\",\n    value: function solids() {\n      return this.filterPhase(function (p) {\n        return p instanceof Solid;\n      });\n    }\n    /**\r\n     * 予めセットアップしたPhaseや温度圧力計を登録する.\r\n     * Phaseはclass内部で, {phase.name:Phase}という辞書として保存される\r\n     *\r\n     * @param {Object} obj\r\n     */\n\n  }, {\n    key: \"setThermodynamicAgent\",\n    value: function setThermodynamicAgent(obj) {\n      var _this = this;\n\n      Object.entries(obj).map(function (kv) {\n        var k = kv[0],\n            v = kv[1];\n\n        switch (k) {\n          case \"phase\":\n            v.map(function (phase) {\n              _this.phase[phase.name] = phase;\n              _this.diffusionProfiles[phase.name] = {};\n            });\n            break;\n\n          case \"thermometer\":\n            _this.thermometer = v;\n            break;\n\n          case \"barometer\":\n            _this.barometer = v;\n            break;\n\n          default:\n            break;\n        }\n      });\n      return this;\n    }\n  }, {\n    key: \"setThermodynamicHandler\",\n    value: function setThermodynamicHandler(func) {\n      this.thermodynamicHandler = func;\n      return this;\n    }\n  }, {\n    key: \"getThermodynamicProperty\",\n    value: function getThermodynamicProperty(opt) {\n      return this.thermodynamicHandler(this, opt);\n    }\n  }, {\n    key: \"setDiffusionProfile\",\n    value: function setDiffusionProfile(diffusion, phaseName, component) {\n      this.diffusionProfiles[phaseName][component] = diffusion;\n      return this;\n    }\n  }, {\n    key: \"getDiffusionProfile\",\n    value: function getDiffusionProfile(phaseName) {\n      return this.diffusionProfiles[phaseName];\n    }\n  }, {\n    key: \"setAction\",\n    value: function setAction(actionFuncList) {\n      this.action = actionFuncList;\n      return this;\n    }\n  }, {\n    key: \"setFinalAction\",\n    value: function setFinalAction(actionFunc) {\n      this.finalAction = actionFunc;\n      return this;\n    }\n  }, {\n    key: \"execAction\",\n    value: function execAction(opt) {\n      var _this2 = this;\n\n      var result = {};\n      this.action.map(function (act, i) {\n        result = act(_this2, opt[i], result);\n      });\n      return this.finalAction(this, opt[opt.length - 1], result);\n    }\n  }]);\n\n  return Magma;\n}();\n\nmodule.exports = Magma;\n\n//# sourceURL=webpack:///../phase/src/magma-system.js?");
+
+/***/ }),
+
+/***/ "../phase/src/matrix.js":
+/*!******************************!*\
+  !*** ../phase/src/matrix.js ***!
+  \******************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("/** 行列インスタンスを生成するジェネレーター\n *\n *\n * Correspondance between Matrix sturucture and Array structure\n * [\n * \t[a11 a12 a13],\n * \t[a21 a22 a23],\n * \t[a31 a32 a33]\n * ]\n*/\nvar Matrix = function Matrix() {\n  var matrix = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : null;\n  var rowNum = arguments.length > 1 ? arguments[1] : undefined;\n  var columnNum = arguments.length > 2 ? arguments[2] : undefined;\n  this.m = [];\n\n  if (matrix) {\n    if (Matrix.isMatrix(matrix)) {\n      this.rowNum = matrix.length;\n      this.columnNum = matrix[0].length;\n      this.m = matrix;\n    } else {\n      return false;\n    }\n  } else {\n    for (var _i = 0; _i < rowNum; _i = _i + 1 | 0) {\n      this.m[_i] = [];\n\n      for (var _j = 0; _j < columnNum; _j = _j + 1 | 0) {\n        this.m[_i][_j] = 0.0;\n      }\n\n      ;\n    }\n\n    ;\n    this.rowNum = rowNum;\n    this.columnNum = columnNum;\n  }\n};\n\nMatrix.isMatrix = function (array) {\n  if (Array.isArray(array)) {\n    return array.map(function (a) {\n      return Array.isArray(a);\n    }).reduce(function (a, b) {\n      return a && b ? true : false;\n    });\n  } else {\n    return false;\n  }\n};\n\nMatrix.prototype.getRowNum = function () {\n  return this.rowNum;\n};\n\nMatrix.prototype.getColumnNum = function () {\n  return this.columnNum;\n}; //>> 行列の掛け算を行う関数\n\n\nMatrix.multiple = function (matA, matB) {\n  //>> 引数の行列サイズが不正ならエラーを返す\n  if (matA.getColumnNum() != matB.getRowNum()) {\n    alert(\"multipleMatrix: Invarid matrix size !\");\n    return;\n  }\n\n  var rowNum = matA.getRowNum();\n  var columnNum = matB.getColumnNum();\n  var iterNum = matA.getColumnNum();\n  var resultMat = new Matrix(null, rowNum, columnNum);\n\n  for (var _i2 = 0; _i2 < rowNum; _i2 = _i2 + 1 | 0) {\n    for (var _j2 = 0; _j2 < columnNum; _j2 = _j2 + 1 | 0) {\n      for (var k = 0; k < iterNum; k = k + 1 | 0) {\n        resultMat.m[_i2][_j2] = resultMat.m[_i2][_j2] + matA.m[_i2][k] * matB.m[k][_j2];\n      }\n    }\n  }\n\n  return resultMat;\n}; //>> 行列の足し算を行う関数\n\n\nMatrix.add = function (matA, matB) {\n  var f = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1.;\n\n  if (matA.getRowNum() != matB.getRowNum() || matA.getColumnNum() != matB.getColumnNum()) {\n    console.log(\"addMatrix: Invarid matrix size !\");\n    return;\n  }\n\n  var rowNum = matA.getRowNum();\n  var columnNum = matA.getColumnNum();\n  var resultMat = new Matrix(null, rowNum, columnNum);\n\n  for (var _i3 = 0; _i3 < rowNum; _i3 = _i3 + 1 | 0) {\n    for (var _j3 = 0; _j3 < columnNum; _j3 = _j3 + 1 | 0) {\n      resultMat.m[_i3][_j3] = matA.m[_i3][_j3] + matB.m[_i3][_j3] * f;\n    }\n  }\n\n  return resultMat;\n}; //>> 逆行列を返す関数\n\n\nMatrix.inverse = function (mat, eps) {\n  if (mat.getRowNum() != mat.getColumnNum()) {\n    console.log(\"inverseMatrix: Invarid matrix size!\");\n    return;\n  }\n\n  var rowNum = mat.getRowNum();\n  var columnNum = mat.getColumnNum();\n  var invMat = new Matrix(null, rowNum, columnNum);\n  var tempMat = new Matrix(null, rowNum, columnNum); //>> Initialize\n\n  for (var _i4 = 0; _i4 < rowNum; _i4 = _i4 + 1 | 0) {\n    for (var _j4 = 0; _j4 < columnNum; _j4 = _j4 + 1 | 0) {\n      tempMat.m[_i4][_j4] = mat.m[_i4][_j4];\n\n      if (_i4 == _j4) {\n        invMat.m[_i4][_j4] = 1.0;\n      } else {\n        invMat.m[_i4][_j4] = 0.0;\n      }\n    }\n  } //>> Pivot transformation\n\n\n  for (var pv = 0; pv < rowNum; pv = pv + 1 | 0) {\n    var big = 0.0;\n    var pv_big = pv;\n\n    for (var _i5 = pv; _i5 < rowNum; _i5 = _i5 + 1 | 0) {\n      if (Math.abs(tempMat.m[_i5][pv]) > big) {\n        big = Math.abs(tempMat.m[_i5][pv]);\n        pv_big = _i5;\n      }\n    }\n\n    for (var _j5 = 0; _j5 < columnNum; _j5 = _j5 + 1 | 0) {\n      var temp = tempMat.m[pv][_j5];\n      tempMat.m[pv][_j5] = tempMat.m[pv_big][_j5];\n      tempMat.m[pv_big][_j5] = temp;\n      temp = invMat.m[pv][_j5];\n      invMat.m[pv][_j5] = invMat.m[pv_big][_j5];\n      invMat.m[pv_big][_j5] = temp;\n    }\n\n    if (big <= eps) {\n      console.log(\"inverseMatrix: There is no inverse matrix !\");\n      return;\n    }\n\n    var amp = tempMat.m[pv][pv];\n\n    for (var _j6 = 0; _j6 < columnNum; _j6 = _j6 + 1 | 0) {\n      tempMat.m[pv][_j6] = tempMat.m[pv][_j6] / amp;\n      invMat.m[pv][_j6] = invMat.m[pv][_j6] / amp;\n    }\n\n    for (var _i6 = 0; _i6 < rowNum; _i6 = _i6 + 1 | 0) {\n      amp = tempMat.m[_i6][pv];\n\n      for (var _j7 = 0; _j7 < columnNum; _j7 = _j7 + 1 | 0) {\n        if (_i6 != pv) {\n          tempMat.m[_i6][_j7] = tempMat.m[_i6][_j7] - tempMat.m[pv][_j7] * amp;\n          invMat.m[_i6][_j7] = invMat.m[_i6][_j7] - invMat.m[pv][_j7] * amp;\n        }\n      }\n    }\n  }\n\n  return invMat;\n};\n/** SOR\n *\n */\n\n\nMatrix.SOR = function (A, v) {\n  var eps = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1e-6;\n  var w = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 1.;\n  var dX = 1;\n  var absX = 1;\n  var raw = A.getRowNum();\n  var col = A.getColumnNum();\n  var x = new Matrix(null, raw, 1);\n  var k = 0;\n\n  while (dX / absX > eps) {\n    dX = 0;\n    absX = 0;\n\n    for (i = 0; i < raw; i++) {\n      var sum = 0;\n\n      for (j = 0; j < col; j++) {\n        if (i !== j) {\n          sum += A.m[i][j] * x.m[j][0];\n        }\n      }\n\n      var newX = 1. / A.m[i][i] * (v.m[i][0] - sum);\n      dX += Math.abs(newX - x.m[i][0]);\n      absX += Math.abs(newX);\n      x.m[i][0] += w * (newX - x.m[i][0]);\n      k++;\n    }\n  }\n\n  console.log(k++);\n  return x;\n};\n\nMatrix.transpose = function (mat) {\n  //if (! Matrix.isMatrix(mat)) return false\n  var rowNum = mat.getRowNum();\n  var columnNum = mat.getColumnNum();\n  var tMat = new Matrix(null, columnNum, rowNum);\n\n  for (var _i7 = 0; _i7 < rowNum; _i7++) {\n    for (var _j8 = 0; _j8 < columnNum; _j8++) {\n      tMat.m[_j8][_i7] = mat.m[_i7][_j8];\n    }\n  }\n\n  return tMat;\n};\n\nmodule.exports = Matrix;\n\n//# sourceURL=webpack:///../phase/src/matrix.js?");
+
+/***/ }),
+
+/***/ "../phase/src/partitioning.js":
+/*!************************************!*\
+  !*** ../phase/src/partitioning.js ***!
+  \************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("var olivine = {\n  Al2O3: {\n    myCompile: function myCompile(liquid) {\n      return function (T) {\n        var P = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;\n        return 0;\n      };\n    },\n    dummy: function dummy(liquid) {\n      return function (T, P) {\n        return 0;\n      };\n    }\n  },\n  CaO: {\n    myCompile: function myCompile(liquid) {\n      return function (T) {\n        var P = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;\n        return 0;\n      };\n    },\n    dummy: function dummy(liquid) {\n      return function (T, P) {\n        return 0;\n      };\n    }\n  },\n  TiO2: {\n    dummy: function dummy(liquid) {\n      return function (T, P) {\n        return 0;\n      };\n    }\n  },\n  Cr2O3: {\n    FreiS2009: function FreiS2009(liquid) {\n      return function (T, P) {\n        return 1.2;\n      };\n    }\n  },\n  NiO: {\n    NormanS2005: function NormanS2005(liquid) {\n      return function (T, P) {\n        return 10;\n      };\n    }\n  }\n};\nvar orthopyroxene = {\n  Al2O3: {\n    myCompile: function myCompile(liquid) {\n      return function (T) {\n        var P = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;\n        return (-0.0043 * P - 0.0052) * liquid.major.MgO + (0.1669 * P + 0.1407);\n      };\n    },\n    dummy: function dummy(liquid) {\n      return function (T, P) {\n        return 0;\n      };\n    }\n  },\n  CaO: {\n    myCompile: function myCompile(liquid) {\n      return function (T) {\n        var P = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;\n        return (0.0083 * P - 0.0189) * liquid.major.MgO + (-0.0451 * P + 0.3185);\n      };\n    },\n    dummy: function dummy(liquid) {\n      return function (T, P) {\n        return 0;\n      };\n    }\n  },\n  TiO2: {\n    dummy: function dummy(liquid) {\n      return function (T, P) {\n        return 0;\n      };\n    }\n  },\n  Cr2O3: {\n    FreiS2009: function FreiS2009(liquid) {\n      return function (T, P) {\n        return 4;\n      };\n    }\n  },\n  NiO: {\n    NormanS2005: function NormanS2005(liquid) {\n      return function (T, P) {\n        return 5;\n      };\n    }\n  }\n};\nvar spinel = {\n  Cr2O3: {\n    LieS2008: function LieS2008(liquid) {\n      return function (T, P) {\n        return 130;\n      };\n    }\n  },\n  NiO: {\n    LieS2008: function LieS2008(liquid) {\n      return function (T, P) {\n        return 2;\n      };\n    }\n  }\n};\nmodule.exports = {\n  olivine: olivine,\n  orthopyroxene: orthopyroxene,\n  spinel: spinel\n};\n\n//# sourceURL=webpack:///../phase/src/partitioning.js?");
+
+/***/ }),
+
+/***/ "../phase/src/phase.js":
+/*!*****************************!*\
+  !*** ../phase/src/phase.js ***!
+  \*****************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("function _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest(); }\n\nfunction _nonIterableRest() { throw new TypeError(\"Invalid attempt to destructure non-iterable instance\"); }\n\nfunction _iterableToArrayLimit(arr, i) { if (!(Symbol.iterator in Object(arr) || Object.prototype.toString.call(arr) === \"[object Arguments]\")) { return; } var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i[\"return\"] != null) _i[\"return\"](); } finally { if (_d) throw _e; } } return _arr; }\n\nfunction _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }\n\nfunction _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError(\"Cannot call a class as a function\"); } }\n\nfunction _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if (\"value\" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }\n\nfunction _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }\n\n/*\r\n\t分配係数の温度・圧力・組成依存性を考慮する\r\n\r\n*/\n\n/* Phase.profile:{\r\n\t\tascend:{\r\n\t\t\tSiO2:[],\r\n\t\t\tMgO:[],\r\n\t\t\t...,\r\n\t\t\tF:[],\tmass fraction of phase\r\n\t\t\tT:[],\tsystem temperature [K]\r\n\t\t\tP:[],\tsystem pressure [GPa]\r\n\t\t\tN:[],\tatom number of phase\r\n\t\t\tx:[]\tradius of phase\r\n\t\t},\r\n\t\tdescend:{\r\n\t\t\t...\r\n\t\t}\r\n\t}\r\n */\nvar GeoChem = __webpack_require__(/*! ./geochem */ \"../phase/src/geochem.js\");\n\nvar ChemicalProfile = __webpack_require__(/*! ./chemical_profile */ \"../phase/src/chemical_profile.js\");\n\nvar sum = function sum(a, b) {\n  return a + b;\n};\n/** class Phase\r\n *\r\n * @param {*} _type\r\n * @param {*} _phaseName\r\n */\n\n\nvar Phase =\n/*#__PURE__*/\nfunction () {\n  function Phase(name) {\n    _classCallCheck(this, Phase);\n\n    this.cationNum = GeoChem.getCationNum();\n    this.molarValue = GeoChem.getMolarValue();\n    this.majorList = GeoChem.getMajorList();\n    this.traceList = GeoChem.getTraceList();\n    this.optionalProperty = [\"F\", \"T\", \"N\", \"P\", \"x\"];\n    this.name = name;\n  }\n\n  _createClass(Phase, [{\n    key: \"setMajorList\",\n    value: function setMajorList(es) {\n      this.majorList = es;\n    }\n  }, {\n    key: \"setTraceList\",\n    value: function setTraceList(es) {\n      this.traceList = es;\n    }\n  }, {\n    key: \"initialize\",\n    value: function initialize() {\n      this.major = this.initMajor();\n      this.major0 = this.initMajor();\n      this.trace = this.initTrace();\n      this.atom = this.initMajor();\n      this.profile = {\n        \"ascend\": new ChemicalProfile([this.majorList, this.traceList, this.optionalProperty]),\n        \"descend\": new ChemicalProfile([this.majorList, this.traceList, this.optionalProperty])\n      };\n      this.isInitialized = true;\n      return this;\n    }\n  }, {\n    key: \"initMajor\",\n    value: function initMajor() {\n      return Phase.initComposition(this.majorList);\n    }\n  }, {\n    key: \"initTrace\",\n    value: function initTrace() {\n      return Phase.initComposition(this.traceList);\n    }\n  }, {\n    key: \"getMixture\",\n    value: function getMixture() {}\n  }, {\n    key: \"resetAtom\",\n    value: function resetAtom() {\n      this.atom = this.initMajor();\n      return this;\n    }\n  }, {\n    key: \"setProperty\",\n    value: function setProperty(attrs, prop) {\n      attrs.forEach(function (attr) {\n        Object.entries(prop).forEach(function (_ref) {\n          var _ref2 = _slicedToArray(_ref, 2),\n              k = _ref2[0],\n              v = _ref2[1];\n\n          if (attr.hasOwnProperty(k)) {\n            attr[k] = v * 1.;\n          }\n        });\n      });\n      return this;\n    }\n  }, {\n    key: \"setComposition\",\n    value: function setComposition(_compo) {\n      this.major = this.initMajor();\n      this.major0 = this.initMajor();\n      this.trace = this.initTrace();\n      this.resetAtom();\n      this.setProperty([this.major, this.major0, this.trace], _compo);\n      return this;\n    }\n  }, {\n    key: \"updateComposition\",\n    value: function updateComposition(_compo) {\n      this.setProperty([this.major, this.major0, this.trace], _compo);\n      return this;\n    }\n  }, {\n    key: \"setMolar\",\n    value: function setMolar(_molar) {\n      this.major = this.initMajor();\n      this.major0 = this.initMajor();\n      this.trace = this.initTrace();\n      this.resetAtom();\n      this.setProperty([this.atom], _compo);\n      return this;\n    }\n  }, {\n    key: \"updateMoler\",\n    value: function updateMoler(_compo) {\n      this.setProperty([this.atom], _compo);\n      return this;\n    }\n  }, {\n    key: \"getWeight\",\n    value: function getWeight() {\n      var _this = this;\n\n      var exceptH2O = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : True;\n      var molar = GeoChem.getMolarValue();\n      return Object.entries(molar).map(function (kv) {\n        var k = kv[0];\n        var v = kv[1];\n        return exceptH2O === True && k === \"H2O\" ? 0 : !_this.atom.hasOwnProperty(k) ? 0 : _this.atom[k] * v;\n      }).reduce(sum);\n    }\n    /*\r\n    getWeight(hydrous = false) {\r\n      let molar = Phase.getMolarValue();\r\n      let weight = 0;\r\n      for (let elem in molar) {\r\n        if (hydrous === false && elem === \"H2O\") continue;\r\n        if (!this.atom[elem]) continue;\r\n        weight += this.atom[elem] * molar[elem];\r\n      };\r\n    */\n\n  }, {\n    key: \"getAtomSum\",\n    value: function getAtomSum() {\n      var _this2 = this;\n\n      var exceptH2O = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : true;\n      var molar = GeoChem.getMolarValue();\n      return Object.entries(molar).map(function (_ref3) {\n        var _ref4 = _slicedToArray(_ref3, 2),\n            k = _ref4[0],\n            v = _ref4[1];\n\n        return exceptH2O === true && k === \"H2O\" ? 0 : !_this2.atom.hasOwnProperty(k) ? 0 : _this2.atom[k];\n      }).reduce(sum);\n    }\n    /*\r\n    getAtomSum(hydrous = false) {\r\n      let molar = Phase.getMolarValue();\r\n        let atomSum = 0;\r\n      for (let elem in molar) {\r\n        if (hydrous === false && elem === \"H2O\") continue;\r\n        if (!this.atom[elem]) continue;\r\n        atomSum = atomSum + this.atom[elem];\r\n      };\r\n      return atomSum;\r\n    }\r\n    */\n\n  }, {\n    key: \"normalizeComposition\",\n    value: function normalizeComposition() {\n      var _this3 = this;\n\n      var exceptH2O = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : True;\n      var elements = Object.keys(this.major);\n      var w = elements.map(function (e) {\n        return e === \"H2O\" ? exceptH2O ? 0 : _this3.major[e] : _this3.major[e];\n      }).reduce(sum, 0);\n      elements.forEach(function (e) {\n        _this3.major[e] = e === \"H2O\" ? exceptH2O ? _this3.major[e] : _this3.major[e] * 100 / w : _this3.major[e] * 100 / w;\n      });\n      return this;\n    }\n  }, {\n    key: \"compo2atom\",\n    value: function compo2atom() {\n      var _this4 = this;\n\n      var exceptH2O = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : true;\n      var normalize = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;\n      var molar = GeoChem.getMolarValue();\n      var major = this.major;\n      Object.entries(major).forEach(function (_ref5) {\n        var _ref6 = _slicedToArray(_ref5, 2),\n            k = _ref6[0],\n            v = _ref6[1];\n\n        var m = molar[k];\n        _this4.atom[k] = exceptH2O === true && k === \"H2O\" ? 0 : v / m;\n      });\n\n      if (normalize) {\n        var atomSum = this.getAtomSum(exceptH2O);\n        Object.keys(major).forEach(function (k) {\n          var v = _this4.atom[k];\n          _this4.atom[k] = exceptH2O === true && k === \"H2O\" ? 0 : v / atomSum;\n        });\n      }\n\n      return this;\n    }\n  }, {\n    key: \"atom2compo\",\n    value: function atom2compo() {\n      var _this5 = this;\n\n      var exceptH2O = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : true;\n      var atom = this.atom;\n      var molar = GeoChem.getMolarValue();\n      var w = Object.entries(atom).map(function (kv) {\n        var k = kv[0],\n            v = kv[1],\n            m = molar[k];\n        return exceptH2O === true && k === \"H2O\" ? 0 : v * m;\n      }).reduce(sum);\n      Object.entries(atom).forEach(function (kv) {\n        var k = kv[0],\n            v = kv[1],\n            m = molar[k];\n        _this5.major[k] = exceptH2O === true && k === \"H2O\" ? _this5.major[k] : v * m / w * 100;\n      });\n      return this;\n    }\n  }, {\n    key: \"getCationSum\",\n    value: function getCationSum() {\n      var _this6 = this;\n\n      var exceptH2O = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : true;\n      return Object.entries(GeoChem.getCationNum()).map(function (kv) {\n        var k = kv[0],\n            v = kv[1];\n        return exceptH2O === true && k === \"H2O\" ? 0 : _this6.atom[k] / v;\n      }).reduce(sum, 0);\n    }\n  }, {\n    key: \"getComposition\",\n    value: function getComposition() {\n      return {\n        major: this.getMajor(),\n        trace: this.getTrace()\n      };\n    }\n  }, {\n    key: \"getMajor\",\n    value: function getMajor() {\n      return this.major;\n    }\n  }, {\n    key: \"getTrace\",\n    value: function getTrace() {\n      return this.trace;\n    }\n  }, {\n    key: \"getMolarNumber\",\n    value: function getMolarNumber() {\n      return this.atom;\n    }\n  }, {\n    key: \"getFeMgRatio\",\n    value: function getFeMgRatio() {\n      return this.major.FeO / this.major.MgO * 40.32 / 71.84;\n    }\n  }, {\n    key: \"getMgNumber\",\n    value: function getMgNumber() {\n      return 100 / (1 + this.getFeMgRatio());\n    }\n  }, {\n    key: \"pushProfile\",\n    value: function pushProfile(F, T, P, path) {\n      this.profile[path].push([this.major, this.trace, {\n        F: F,\n        T: T,\n        P: P,\n        N: this.getAtomSum(),\n        x: 0\n      }]);\n      return this;\n    }\n  }, {\n    key: \"popProfile\",\n    value: function popProfile(path) {\n      return this.profile[path].pop();\n    }\n  }, {\n    key: \"getProfile\",\n    value: function getProfile(path) {\n      return this.profile[path].get();\n    }\n  }, {\n    key: \"resetProfile\",\n    value: function resetProfile() {\n      var _this7 = this;\n\n      var _path = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [\"ascend\", \"descend\"];\n\n      var path = Array.isArray(_path) ? _path : [_path];\n      path.map(function (p) {\n        _this7.profile[p].reset([_this7.majorList, _this7.traceList, _this7.optionalProperty]);\n      });\n      this.major0 = {};\n      return this;\n    }\n  }, {\n    key: \"profileToCsv\",\n    value: function profileToCsv(path) {\n      var separator = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : \",\";\n      var str = \"\";\n      var profile = this.getProfile(path);\n      var keys = Object.keys(profile);\n      end = new RegExp(separator + \"$\");\n      keys.forEach(function (v) {\n        str += '\"' + v.toString().replace('\"', '') + '\"' + separator;\n      });\n      str = str.replace(end, '');\n      str += \"\\n\";\n\n      var _loop = function _loop(i, l) {\n        keys.forEach(function (k) {\n          str += '\"' + profile[k][i].toString().replace('\"', '') + '\"' + separator;\n        });\n        str = str.replace(end, '\\n');\n      };\n\n      for (var i = 0, l = profile[keys[0]].length; i < l; i++) {\n        _loop(i, l);\n      }\n\n      return str;\n    }\n  }], [{\n    key: \"isPhase\",\n    value: function isPhase(obj) {\n      return obj instanceof Phase;\n    }\n  }, {\n    key: \"initComposition\",\n    value: function initComposition(elementList) {\n      var obj = {};\n      elementList.forEach(function (e) {\n        obj[e] = 0;\n      });\n      return obj;\n    }\n  }]);\n\n  return Phase;\n}();\n\nmodule.exports = Phase;\n\n//# sourceURL=webpack:///../phase/src/phase.js?");
+
+/***/ }),
+
+/***/ "../phase/src/solid.js":
+/*!*****************************!*\
+  !*** ../phase/src/solid.js ***!
+  \*****************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("function _typeof(obj) { if (typeof Symbol === \"function\" && typeof Symbol.iterator === \"symbol\") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === \"function\" && obj.constructor === Symbol && obj !== Symbol.prototype ? \"symbol\" : typeof obj; }; } return _typeof(obj); }\n\nfunction _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError(\"Cannot call a class as a function\"); } }\n\nfunction _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if (\"value\" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }\n\nfunction _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }\n\nfunction _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === \"object\" || typeof call === \"function\")) { return call; } return _assertThisInitialized(self); }\n\nfunction _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\"); } return self; }\n\nfunction _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }\n\nfunction _inherits(subClass, superClass) { if (typeof superClass !== \"function\" && superClass !== null) { throw new TypeError(\"Super expression must either be null or a function\"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); if (superClass) _setPrototypeOf(subClass, superClass); }\n\nfunction _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }\n\nvar Phase = __webpack_require__(/*! ./phase */ \"../phase/src/phase.js\");\n\nvar sum = function sum(a, b) {\n  return a + b;\n};\n/** class Solid extends Phase\r\n *\r\n * @param {*} name\r\n */\n\n\nvar Solid =\n/*#__PURE__*/\nfunction (_Phase) {\n  _inherits(Solid, _Phase);\n\n  function Solid(name) {\n    var _this;\n\n    _classCallCheck(this, Solid);\n\n    _this = _possibleConstructorReturn(this, _getPrototypeOf(Solid).call(this, name));\n    _this.D = {};\n    _this.KD = {};\n    _this.dN = 0;\n    _this.solver = {};\n    _this.answerVector = {};\n    return _this;\n  }\n\n  _createClass(Solid, [{\n    key: \"setAtomFraction\",\n    value: function setAtomFraction(dN) {\n      this.dN = dN;\n      return this;\n    }\n  }, {\n    key: \"setD\",\n    value: function setD(opt) {\n      var _this2 = this;\n\n      Object.entries(opt).map(function (o) {\n        var e = o[0],\n            D = o[1];\n        _this2.D[e] = D;\n      });\n      return this;\n    }\n  }, {\n    key: \"setKD\",\n    value: function setKD(opt) {\n      var _this3 = this;\n\n      Object.entries(opt).map(function (o) {\n        var e = o[0],\n            KD = o[1];\n        _this3.KD[e] = KD;\n      });\n      return this;\n    }\n  }, {\n    key: \"getMeltMgNumber\",\n    value: function getMeltMgNumber() {\n      return 100 / (1 + this.getFeMgRatio() / this.KD.Fe_Mg);\n    }\n  }, {\n    key: \"setRadius\",\n    value: function setRadius(_beforeR, _afterR, _path) {\n      var l = this.profile[_path].profile.F.length;\n\n      var f = (Math.pow(_afterR, 3) - Math.pow(_beforeR, 3)) / this.profile[_path].profile.F[l - 1];\n\n      for (var i = 0; i < l; i++) {\n        this.profile[_path].profile.x[i] = Math.pow(f * this.profile[_path].F[i] + Math.pow(_beforeR, 3), 0.333333);\n      }\n\n      return this;\n    }\n  }, {\n    key: \"setSolver\",\n    value: function setSolver(_adjacentPhaseName, _solverFunc) {\n      this.solver[_adjacentPhaseName] = _solverFunc(this);\n      return this;\n    }\n  }, {\n    key: \"setAnswerVector\",\n    value: function setAnswerVector(_adjacentPhaseName, _answerVector) {\n      this.answerVector[_adjacentPhaseName] = _answerVector;\n      return this;\n    }\n  }, {\n    key: \"equilibrate\",\n    value: function equilibrate(_adjacentPhaseName, _T, _P) {\n      var equiCompo = this.solver[_adjacentPhaseName](_T, _P);\n\n      this.major = equiCompo.major;\n      this.trace = equiCompo.trace;\n      return this;\n    }\n  }, {\n    key: \"compensateFe\",\n    value: function compensateFe(mineral) {\n      var method = {\n        spinel: function spinel(_spinel) {\n          var atom = _spinel.atom;\n\n          var atomSum = _spinel.getAtomSum();\n\n          var oxygenNum = 16;\n        }\n      };\n    }\n  }], [{\n    key: \"isSolid\",\n    value: function isSolid(obj) {\n      return obj instanceof Solid;\n    }\n  }]);\n\n  return Solid;\n}(Phase);\n\nmodule.exports = Solid;\n\n//# sourceURL=webpack:///../phase/src/solid.js?");
+
+/***/ }),
+
+/***/ "./model-src/opx_zoning_free_edge/along_liquid_line.js":
+/*!*************************************************************!*\
+  !*** ./model-src/opx_zoning_free_edge/along_liquid_line.js ***!
+  \*************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("var recordProfile = __webpack_require__(/*! ./record_profile_with_local_equilibrium */ \"./model-src/opx_zoning_free_edge/record_profile_with_local_equilibrium.js\");\n/**\r\n * Crystals grow in the host melt which is already set composition.\r\n * Composition of growing part of crystals are calculated by mass balance equation with partitioning coefficients\r\n *   by assuming establishment of local equilibrium.\r\n * Once the part of crystal grows, it no longer has effect on the part of growing crystal after it.\r\n * Therefore, the condition of crystal growth is Rayleigh fractionation.\r\n *\r\n * Considered solid phases are:\r\n *  1. olivine\r\n *  2. orthopyroxene\r\n *  3. spinel\r\n * Reaction stoichiometry of solid phases are constant.\r\n * In this method, stoichiometry of orthopyroxene and spinel are given.\r\n *\r\n * Crystal grow until Mg# of a given phase reach a specific value.\r\n */\n\n\nvar alongLiquidLine = function alongLiquidLine(magma, ope, result) {\n  var dF = ope.dF,\n      targetPhase = ope.targetPhase,\n      MgN_beforeCrystallization = ope.MgN_beforeCrystallization,\n      stoichiometry = ope.stoichiometry,\n      P = ope.P;\n  magma.setThermodynamicAgent({\n    barometer: function barometer(_) {\n      return P;\n    }\n  }); // 結晶成長を伴うメルト組成変化\n\n  var pathName = recordProfile(magma, targetPhase, MgN_beforeCrystallization, stoichiometry, dF, true);\n  /**\r\n    * 注目する相のプロファイルをスタックに追加\r\n    */\n\n  magma.custom.profileStack.push(magma.phase[targetPhase].profile[pathName].get());\n  magma.custom.differentiationLineStack.push(magma.phase.melt.profile[pathName].get());\n  return {};\n};\n\nmodule.exports = alongLiquidLine;\n\n//# sourceURL=webpack:///./model-src/opx_zoning_free_edge/along_liquid_line.js?");
+
+/***/ }),
+
+/***/ "./model-src/opx_zoning_free_edge/approximate_magma_mixing_line.js":
+/*!*************************************************************************!*\
+  !*** ./model-src/opx_zoning_free_edge/approximate_magma_mixing_line.js ***!
+  \*************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("var recordProfile = __webpack_require__(/*! ./record_profile_with_local_equilibrium */ \"./model-src/opx_zoning_free_edge/record_profile_with_local_equilibrium.js\");\n/**\r\n     * Approximated simulation of magma mixing.\r\n     * The exotic melt composition and its mass contribution to the mixture is unknown.\r\n     *\r\n     * We approximate the mixture composition by assuming\r\n     *   mixture and erupted melt are on the same liquid line of ascent or that of descent.\r\n     * Therefore, the mixture can be calculated by addition or removing of small fraction of\r\n     *   solid phases repeatedly.\r\n     *\r\n     * @param {*} magma\r\n     * @param {*} ope\r\n     * @param {*} result\r\n     */\n\n\nvar approximateMagmaMixingLine = function approximateMagmaMixingLine(magma, ope, result) {\n  var dF = ope.dF,\n      targetPhase = ope.targetPhase,\n      MgN_beforeMixing = ope.MgN_beforeMixing,\n      stoichiometry = ope.stoichiometry,\n      P = ope.P;\n  magma.setThermodynamicAgent({\n    barometer: function barometer(_) {\n      return P;\n    }\n  });\n  var pathName = recordProfile(magma, targetPhase, MgN_beforeMixing, stoichiometry, dF, true);\n  magma.custom.mixingLineStack.push(magma.phase.melt.profile[pathName].get());\n  return {};\n};\n\nmodule.exports = approximateMagmaMixingLine;\n\n//# sourceURL=webpack:///./model-src/opx_zoning_free_edge/approximate_magma_mixing_line.js?");
+
+/***/ }),
+
+/***/ "./model-src/opx_zoning_free_edge/def_phases.js":
+/*!******************************************************!*\
+  !*** ./model-src/opx_zoning_free_edge/def_phases.js ***!
+  \******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("var Liquid = __webpack_require__(/*! ../../../phase/src/liquid */ \"../phase/src/liquid.js\");\n\nvar Solid = __webpack_require__(/*! ../../../phase/src/solid */ \"../phase/src/solid.js\");\n\nvar _require = __webpack_require__(/*! ../../../phase/src/geothermobarometer */ \"../phase/src/geothermobarometer.js\"),\n    thermometer = _require.thermometer;\n\nvar Equilibrate = __webpack_require__(/*! ../../../phase/src/equilibrate */ \"../phase/src/equilibrate.js\");\n\nvar D = __webpack_require__(/*! ../../../phase/src/partitioning */ \"../phase/src/partitioning.js\");\n\nvar KD = __webpack_require__(/*! ../../../phase/src/exchangePartitioning */ \"../phase/src/exchangePartitioning.js\");\n\nvar melt = new Liquid('melt').initialize();\nvar olivine = new Solid('olivine').initialize().setKD({\n  'Fe_Mg': KD.olivine.Fe_Mg.Beattie1993()\n}).setD({\n  'Cr2O3': D.olivine.Cr2O3.FreiS2009(),\n  'NiO': D.olivine.NiO.NormanS2005(),\n  'Al2O3': D.olivine.Al2O3.myCompile(melt),\n  'CaO': D.olivine.CaO.myCompile(melt),\n  'TiO2': D.olivine.TiO2.dummy()\n}).setSolver('melt', Equilibrate.olivine_melt(melt, 'solve'));\nvar orthopyroxene = new Solid('orthopyroxene').initialize().setKD({\n  'Fe_Mg': KD.orthopyroxene.Fe_Mg.Beattie1993()\n}).setD({\n  'Cr2O3': D.orthopyroxene.Cr2O3.FreiS2009(),\n  'NiO': D.orthopyroxene.NiO.NormanS2005(),\n  'Al2O3': D.orthopyroxene.Al2O3.myCompile(melt),\n  'CaO': D.orthopyroxene.CaO.myCompile(melt),\n  'TiO2': D.orthopyroxene.TiO2.dummy()\n}).setSolver('melt', Equilibrate.opx_melt(melt, 'solve'));\nvar spinel = new Solid('spinel').initialize().setD({\n  'Cr2O3': D.spinel.Cr2O3.LieS2008(),\n  'NiO': D.spinel.NiO.LieS2008()\n}).setSolver('melt', Equilibrate.spinel_melt(melt, 'solve'));\n\nvar meltThermometer = function meltThermometer(P) {\n  return thermometer.Sugawara2000(melt)(P) - thermometer.liquidusDropMG2008(melt)(P);\n};\n\nmodule.exports = {\n  melt: melt,\n  olivine: olivine,\n  orthopyroxene: orthopyroxene,\n  spinel: spinel,\n  meltThermometer: meltThermometer\n};\n\n//# sourceURL=webpack:///./model-src/opx_zoning_free_edge/def_phases.js?");
+
+/***/ }),
+
+/***/ "./model-src/opx_zoning_free_edge/eval_diffusion.js":
+/*!**********************************************************!*\
+  !*** ./model-src/opx_zoning_free_edge/eval_diffusion.js ***!
+  \**********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("function _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread(); }\n\nfunction _nonIterableSpread() { throw new TypeError(\"Invalid attempt to spread non-iterable instance\"); }\n\nfunction _iterableToArray(iter) { if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === \"[object Arguments]\") return Array.from(iter); }\n\nfunction _arrayWithoutHoles(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } }\n\nfunction _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest(); }\n\nfunction _nonIterableRest() { throw new TypeError(\"Invalid attempt to destructure non-iterable instance\"); }\n\nfunction _iterableToArrayLimit(arr, i) { if (!(Symbol.iterator in Object(arr) || Object.prototype.toString.call(arr) === \"[object Arguments]\")) { return; } var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i[\"return\"] != null) _i[\"return\"](); } finally { if (_d) throw _e; } } return _arr; }\n\nfunction _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }\n\n/**\r\n * Calculate radius in the crystal by assuming spherical shape and constant density\r\n *   from mass fraction at each step of growth.\r\n * The initial and final radius are known by line analysis with EPMA.\r\n *\r\n * @param {*} initialRadius\r\n * @param {*} finalRadius\r\n * @param {*} totalMass\r\n */\nvar massToRadiusByConstantDensity = function massToRadiusByConstantDensity(initialRadius, finalRadius, totalMass) {\n  var A = (Math.pow(finalRadius, 3) - Math.pow(initialRadius, 3)) / totalMass;\n  return function (f) {\n    return Math.pow(A * (totalMass - f) + Math.pow(initialRadius, 3), 1 / 3);\n  };\n};\n\nvar reverseProfile = function reverseProfile(profile) {\n  var newProfile = {};\n  Object.entries(profile).map(function (_ref) {\n    var _ref2 = _slicedToArray(_ref, 2),\n        k = _ref2[0],\n        v = _ref2[1];\n\n    newProfile[k] = _toConsumableArray(v).reverse();\n  });\n  return newProfile;\n};\n/**\r\n * Relate composition and radius in the position of the crystal.\r\n *\r\n * @param {*} magma\r\n * @param {*} targetPhase\r\n * @param {*} Rini\r\n * @param {*} Rfin\r\n */\n\n\nvar getProfileWithRadius = function getProfileWithRadius(profile, Rini, Rfin) {\n  var newProfile = Object.assign(profile, {});\n  var l = newProfile.F.length;\n  newProfile.x = newProfile.F.map(massToRadiusByConstantDensity(Rini, Rfin, newProfile.F[0]));\n  return newProfile;\n};\n/**\r\n * Simulate elemental diffusion in the focused crystal.\r\n * The crystal is spherical symmetry.\r\n * Diffusion coefficients depends only on temperature as Arrhenius relation.\r\n *\r\n * In the model, inter diffusivity of Fe and Mg components and self diffusivity of Cr2O3 are\r\n *  considered.\r\n * During diffusion, the host melt composition is constant and local equilibrium at crystal surface\r\n *  always established.\r\n *\r\n * Spatially one dimension diffusion equation is numerically solved by Crank-Nicolson method.\r\n * Neumann condition at the center of crystal, and Dericklet condition at the edge.\r\n *\r\n * The scale of time and temperature for diffusivity is treated as unknown parameter, 'total scale of diffusion'.\r\n * The scale is originally introduced by Lasaga (1983) as compressed time.\r\n * Total scale of diffusion represent all possible cooling history which yields the same value of compressed time.\r\n *\r\n * @param {MagmaSystem} magma\r\n * @param {*} ope\r\n * @param {*} result\r\n */\n\n\nvar evalDiffusion = function evalDiffusion(magma, ope, result) {\n  var targetPhase = ope.targetPhase,\n      tau = ope.tau,\n      R = ope.R,\n      Rprev = ope.Rprev,\n      divNum = ope.divNum; // chemical profileを取得\n\n  var profile = magma.custom.profileStack.length > 0 ? reverseProfile(magma.custom.profileStack.pop()) : {};\n  var section = getProfileWithRadius(profile, Rprev, R);\n  var diffusionInSphere = magma.getDiffusionProfile(targetPhase);\n  Object.values(diffusionInSphere).map(function (d) {\n    d.appendSection(section).setMaxCompressedTime(tau).divideSpaceEqually(divNum).nondimensionalize().implicitCN().redimensionalize();\n  });\n  return {};\n};\n\nmodule.exports = evalDiffusion;\n\n//# sourceURL=webpack:///./model-src/opx_zoning_free_edge/eval_diffusion.js?");
+
+/***/ }),
+
+/***/ "./model-src/opx_zoning_free_edge/get_chemical_zoning.js":
+/*!***************************************************************!*\
+  !*** ./model-src/opx_zoning_free_edge/get_chemical_zoning.js ***!
+  \***************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("/**\r\n * Return chemical zoning of modeled and not-diffused\r\n *\r\n * {\r\n *      \"modeled\" : {\r\n *          \"x\" : [],\r\n *          [component A] : [],\r\n *          [component B] : []\r\n *      },\r\n *      \"no_diffusion\" : {\r\n *          \"x\" : [],\r\n *          [component A] : [],\r\n *          [component B] : []\r\n *      },\r\n * }\r\n *\r\n * @param {*} model\r\n * @param {*} params\r\n * @param {*} data\r\n * @param {*} phase\r\n */\nvar getChemicalZoning = function getChemicalZoning(model, params, data, phase) {\n  var magma = model(params, data, false);\n  var ndProfiles = magma.diffusionProfiles[phase];\n  var modeled_profile = model(params, data);\n  var result = {\n    modeled: {},\n    no_diffusion: {}\n  };\n  var components = Object.keys(modeled_profile);\n  components.map(function (comp) {\n    result.modeled[comp] = modeled_profile[comp];\n    if (comp === \"x\") return;\n    result.no_diffusion[comp] = ndProfiles[comp].notDiffusedProfile.get().c;\n    result.no_diffusion[\"x\"] = ndProfiles[comp].notDiffusedProfile.get().x;\n  });\n  return result;\n};\n\nmodule.exports = getChemicalZoning;\n\n//# sourceURL=webpack:///./model-src/opx_zoning_free_edge/get_chemical_zoning.js?");
+
+/***/ }),
+
+/***/ "./model-src/opx_zoning_free_edge/index.js":
+/*!*************************************************!*\
+  !*** ./model-src/opx_zoning_free_edge/index.js ***!
+  \*************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("var genMagmaModel = __webpack_require__(/*! ./model */ \"./model-src/opx_zoning_free_edge/model.js\");\n\nvar sampleMeltComposition = __webpack_require__(/*! ./sample_melt_composition */ \"./model-src/opx_zoning_free_edge/sample_melt_composition.js\");\n\nvar integrateLiquidLine = __webpack_require__(/*! ./integrate_liquid_line */ \"./model-src/opx_zoning_free_edge/integrate_liquid_line.js\");\n\nvar getChemicalZoning = __webpack_require__(/*! ./get_chemical_zoning */ \"./model-src/opx_zoning_free_edge/get_chemical_zoning.js\");\n/**\r\n * option : {\r\n *  targetPhase: String,\r\n *  D0 :{\r\n *    orthopyroxene : {\r\n *      Fe_Mg : {\r\n *        d0 : Number,\r\n *        E : Number\r\n *      },\r\n *      Cr2O3 : {\r\n *        d0 : Number,\r\n *        E : Number\r\n *      }\r\n *    }\r\n *  },\r\n *  dF : Number,\r\n *  radius : [Number],\r\n *  finalMelt : {\r\n *    composition : {String : Number},\r\n *    Fe2Ratio : Number\r\n *  },\r\n *  P : [Number],\r\n *  MgN_atRim : Number\r\n * }\r\n */\n\n\nmodule.exports = function (option) {\n  var _genMagmaModel = genMagmaModel(option),\n      magma = _genMagmaModel.magma,\n      model = _genMagmaModel.model;\n  /**\r\n   * Initial value of parameters are not important.\r\n   */\n\n\n  var parameters = Array(option.radius.length - 1).fill(0).map(function (_) {\n    return {\n      'MgN_beforeCrystallization': 85,\n      'growth_stoichiometry_orthopyroxene': 0.5,\n      'growth_stoichiometry_spinel': 0.05,\n      'MgN_beforeMixing': 80,\n      'mixing_stoichiometry_orthopyroxene': 0.5,\n      'mixing_stoichiometry_spinel': 0.05,\n      'log10_tau': 6\n    };\n  });\n  /**\r\n   * In the model, initial and final Mg# of the orthopyroxene phenocryst during crystal growth are unknown parameters.\r\n   */\n\n  var updateCondition = option.hasOwnProperty(\"updateCondition\") ? option.updateCondition : {\n    'MgN_beforeCrystallization': {\n      'val': 0.5,\n      'max': 93,\n      'min': 75\n    },\n    'growth_stoichiometry_orthopyroxene': {\n      'val': 0.05,\n      'max': 1,\n      'min': 0\n    },\n    'growth_stoichiometry_spinel': {\n      'val': 0.005,\n      'max': 0.1,\n      'min': 0\n    },\n    'MgN_beforeMixing': {\n      'val': 0.5,\n      'max': 93,\n      'min': 75\n    },\n    'mixing_stoichiometry_orthopyroxene': {\n      'val': 0.05,\n      'max': 1,\n      'min': 0\n    },\n    'mixing_stoichiometry_spinel': {\n      'val': 0.005,\n      'max': 0.1,\n      'min': 0\n    },\n    'log10_tau': {\n      'val': 0.1,\n      'max': 12,\n      'min': 0\n    }\n  };\n  /**\r\n   * Mg# of the opx before fractional crystallization\r\n   *   must be larger than that after crystallization,\r\n   *   which is assumed to be Mg# before magma mixing.\r\n   *\r\n   * Sum of soichiometry of crystallization of opx and\r\n   *   spinel must be less equal to 1.\r\n   * Sum of fraction of approximating magma mixing\r\n   *  of opx and spinel is assumed to be less equal\r\n   *  to 1.\r\n   */\n\n  var constrain = {\n    MgN_beforeCrystallization: function MgN_beforeCrystallization(cand, i, parameter) {\n      return cand > parameter[i].MgN_beforeMixing;\n    },\n    MgN_beforeMixing: function MgN_beforeMixing(cand, i, parameter) {\n      return cand < parameter[i].MgN_beforeCrystallization;\n    },\n    growth_stoichiometry_orthopyroxene: function growth_stoichiometry_orthopyroxene(cand, i, parameter) {\n      return 0 < cand && cand + parameter[i].growth_stoichiometry_spinel <= 1;\n    },\n    growth_stoichiometry_spinel: function growth_stoichiometry_spinel(cand, i, parameter) {\n      return cand + parameter[i].growth_stoichiometry_orthopyroxene <= 1;\n    },\n    mixing_stoichiometry_orthopyroxene: function mixing_stoichiometry_orthopyroxene(cand, i, parameter) {\n      return 0 < cand && cand + parameter[i].mixing_stoichiometry_spinel <= 1;\n    },\n    mixing_stoichiometry_spinel: function mixing_stoichiometry_spinel(cand, i, parameter) {\n      return cand + parameter[i].mixing_stoichiometry_orthopyroxene <= 1;\n    }\n  };\n  var mode = \"estimator\";\n  return {\n    model: model,\n    parameters: parameters,\n    updateCondition: updateCondition,\n    constrain: constrain,\n    mode: mode,\n    magma: magma,\n    sampleMeltComposition: sampleMeltComposition,\n    integrateLiquidLine: integrateLiquidLine,\n    getChemicalZoning: getChemicalZoning\n  };\n};\n\n//# sourceURL=webpack:///./model-src/opx_zoning_free_edge/index.js?");
+
+/***/ }),
+
+/***/ "./model-src/opx_zoning_free_edge/initialize_magma_system.js":
+/*!*******************************************************************!*\
+  !*** ./model-src/opx_zoning_free_edge/initialize_magma_system.js ***!
+  \*******************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("var InterDiffusion = __webpack_require__(/*! ../../../diffusion/src/inter-diffusion */ \"../diffusion/src/inter-diffusion.js\");\n\nvar SelfDiffusion = __webpack_require__(/*! ../../../diffusion/src/self-diffusion */ \"../diffusion/src/self-diffusion.js\");\n\nvar Diffusion = __webpack_require__(/*! ../../../diffusion/src/diffusion */ \"../diffusion/src/diffusion.js\");\n\nvar Liquid = __webpack_require__(/*! ../../../phase/src/liquid */ \"../phase/src/liquid.js\");\n/**\r\n * Initialize magma system condition.\r\n *  1. Register Phase instances and thermometer, barometer, and oxybarometer etc.\r\n *  2. Set initial composition of the liquid phase.\r\n *  3. Register Diffusion instances to the target phase.\r\n *  4. Prepare custum slots for recording profiles.\r\n *\r\n * @param {MagmaSystem} magma\r\n * @param {Object} options\r\n *  @property {Object} systemComponents\r\n *     @property {Array<Phase>} phase\r\n *     @property? {Function} thermometer\r\n *  @property {Function} thermometer\r\n *  @property {String} targetPhase\r\n *  @property {Object} Diffusion\r\n *  @property {Object} finalMelt\r\n */\n\n\nvar initialize = function initialize(magma, options) {\n  var systemComponents = options.systemComponents,\n      targetPhase = options.targetPhase,\n      D = options.D,\n      finalMelt = options.finalMelt;\n  magma.setThermodynamicAgent(systemComponents);\n\n  if (!magma.phase.melt instanceof Liquid) {\n    throw new Error(\"Must set a Liquid phase which name is 'melt'\");\n  }\n\n  magma.phase.melt.setComposition(finalMelt.composition);\n\n  if (finalMelt.hasOwnProperty(\"Fe2Ratio\")) {\n    magma.phase.melt.setFe2Ratio(finalMelt.Fe2Ratio).compensateFe();\n  }\n\n  var FeMgDif = new InterDiffusion('FeO', 'MgO', Diffusion.getD(D, targetPhase, 'Fe_Mg'), 'atom');\n  var CrDif = new SelfDiffusion('Cr2O3', Diffusion.getD(D, targetPhase, 'Cr2O3'));\n  magma.setDiffusionProfile(FeMgDif, targetPhase, 'Fe_Mg');\n  magma.setDiffusionProfile(CrDif, targetPhase, 'Cr2O3');\n  magma.custom.profileStack = [];\n  magma.custom.mixingLineStack = [];\n  magma.custom.differentiationLineStack = [];\n  return {};\n};\n\nmodule.exports = initialize;\n\n//# sourceURL=webpack:///./model-src/opx_zoning_free_edge/initialize_magma_system.js?");
+
+/***/ }),
+
+/***/ "./model-src/opx_zoning_free_edge/integrate_liquid_line.js":
+/*!*****************************************************************!*\
+  !*** ./model-src/opx_zoning_free_edge/integrate_liquid_line.js ***!
+  \*****************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("var len = function len(array) {\n  return array.length;\n};\n/**\r\n * Return an object : {\r\n *      fractionation_line : {\r\n *          stage-[n] : {\r\n *              SiO2 : [],\r\n *              Al2O3 : [], ...\r\n *          },\r\n *          stage-[n-1] : {\r\n *              SiO2 : [],\r\n *              Al2O3 : [], ...\r\n *          },\r\n *          ...\r\n *      },\r\n *      mixing_line : {\r\n *          stage-[n] : {\r\n *              SiO2 : [],\r\n *              Al2O3 : [], ...\r\n *          },\r\n *          stage-[n-1] : {\r\n *              SiO2 : [],\r\n *              Al2O3 : [], ...\r\n *          },\r\n *          ...\r\n *      }\r\n * }\r\n *\r\n * @param {MagmaSys} magma\r\n */\n\n\nvar integrateLiquidLine = function integrateLiquidLine(magma) {\n  var fracLines = magma.custom.differentiationLineStack;\n  var mixLines = magma.custom.mixingLineStack;\n  var l_frac = len(fracLines),\n      l_mix = len(mixLines);\n  var result = {\n    fractionation_line: {},\n    mixing_line: {}\n  };\n  fracLines.map(function (line, i) {\n    result.fractionation_line[\"stage-\".concat(l_frac - i - 1)] = line;\n  });\n  mixLines.map(function (line, i) {\n    result.mixing_line[\"stage-\".concat(l_mix - i - 1)] = line;\n  });\n  return result;\n};\n\nmodule.exports = integrateLiquidLine;\n\n//# sourceURL=webpack:///./model-src/opx_zoning_free_edge/integrate_liquid_line.js?");
+
+/***/ }),
+
+/***/ "./model-src/opx_zoning_free_edge/map_diffused_profile_to_position.js":
+/*!****************************************************************************!*\
+  !*** ./model-src/opx_zoning_free_edge/map_diffused_profile_to_position.js ***!
+  \****************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("function _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest(); }\n\nfunction _nonIterableRest() { throw new TypeError(\"Invalid attempt to destructure non-iterable instance\"); }\n\nfunction _iterableToArrayLimit(arr, i) { if (!(Symbol.iterator in Object(arr) || Object.prototype.toString.call(arr) === \"[object Arguments]\")) { return; } var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i[\"return\"] != null) _i[\"return\"](); } finally { if (_d) throw _e; } } return _arr; }\n\nfunction _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }\n\n/**\r\n    *\r\n    * Map array of diffused values to the position from\r\n    *  the center.\r\n    *\r\n    * @param {*} magma\r\n    * @param {*} opt\r\n    */\nvar mapDiffusedProfileToPosition = function mapDiffusedProfileToPosition(magma, opt) {\n  var diffusion = magma.diffusionProfiles[opt.targetPhase];\n  var dataPos = opt.dataPos;\n  return Object.entries(diffusion).map(function (_ref) {\n    var _ref2 = _slicedToArray(_ref, 2),\n        k = _ref2[0],\n        v = _ref2[1];\n\n    // データに合わせてxの位置を変形\n    v.profile.transformByRadius(dataPos);\n    var p = v.profile.get();\n    var obj = {};\n    obj.x = p.x;\n    obj[k] = p.c;\n    return obj;\n  }).reduce(function (a, b) {\n    return Object.assign(a, b);\n  }, {});\n};\n\nmodule.exports = mapDiffusedProfileToPosition;\n\n//# sourceURL=webpack:///./model-src/opx_zoning_free_edge/map_diffused_profile_to_position.js?");
+
+/***/ }),
+
+/***/ "./model-src/opx_zoning_free_edge/map_model_parameter.js":
+/*!***************************************************************!*\
+  !*** ./model-src/opx_zoning_free_edge/map_model_parameter.js ***!
+  \***************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("/** ================================================\r\n * The model finally generate chemical profile of orthopyroxene.\r\n * The host melt is always homogenous.\r\n * Therefore, crystal composition represents whole part of the magma system.\r\n * The crystals are spherical symmetry.\r\n * The crystal experiences multiple stages of crystal growth and lattice diffusion.\r\n * The lattice diffusion progresses after crystal growth terminated in each stage.\r\n * The chemical composition of grown crystal determined by host melt composition and partitioning coefficients.\r\n *\r\n *\r\n * @param {Object} mcmc_param\r\n *    @property {Number} MgN_beforeCrystallization\r\n *    @property {Number} growth_stoichiometry_orthopyroxene\r\n *    @property {Number} growth_stoichiometry_spinel\r\n *    @property {Number} mixing_stoichiometry_orthopyroxene\r\n *    @property {Number} mixing_stoichiometry_spinel\r\n *    @property {Number} log10_tau\r\n *\r\n * @param {int} shpere_idx\r\n *\r\n * @param {object} glbl_opt\r\n *\r\n * @return {Object}\r\n */\nvar mapLiquidLineParam = function mapLiquidLineParam(mcmc_param, sphere_idx, glbl_opt) {\n  return {\n    'dF': glbl_opt.dF,\n    'targetPhase': glbl_opt.targetPhase,\n    'MgN_beforeCrystallization': mcmc_param.MgN_beforeCrystallization,\n    'stoichiometry': {\n      'olivine': 1 - mcmc_param.growth_stoichiometry_orthopyroxene - mcmc_param.growth_stoichiometry_spinel,\n      'orthopyroxene': mcmc_param.growth_stoichiometry_orthopyroxene,\n      'spinel': mcmc_param.growth_stoichiometry_spinel\n    },\n\n    /*'Fe2Ratio': glbl_opt.melt0.Fe2Ratio, include in glbl_opt.melt*/\n    'P': glbl_opt.P[sphere_idx]\n  };\n};\n\nvar mapLiquidLineForCrystalRimParam = function mapLiquidLineForCrystalRimParam(mcmc_param, sphere_idx, glbl_opt) {\n  return {\n    'dF': glbl_opt.dF,\n    'targetPhase': glbl_opt.targetPhase,\n    'MgN_beforeMixing': glbl_opt.MgN_atRim,\n    'stoichiometry': {\n      'olivine': 1 - mcmc_param.mixing_stoichiometry_orthopyroxene - mcmc_param.mixing_stoichiometry_spinel,\n      'orthopyroxene': mcmc_param.mixing_stoichiometry_orthopyroxene,\n      'spinel': mcmc_param.mixing_stoichiometry_spinel\n    },\n    'P': glbl_opt.P[sphere_idx]\n  };\n};\n\nvar mapMagmaMixingLineParam = function mapMagmaMixingLineParam(mcmc_param, sphere_idx, glbl_opt) {\n  return {\n    'dF': glbl_opt.dF,\n    'targetPhase': glbl_opt.targetPhase,\n    'MgN_beforeMixing': mcmc_param.MgN_beforeMixing,\n    'stoichiometry': {\n      'olivine': 1 - mcmc_param.mixing_stoichiometry_orthopyroxene - mcmc_param.mixing_stoichiometry_spinel,\n      'orthopyroxene': mcmc_param.mixing_stoichiometry_orthopyroxene,\n      'spinel': mcmc_param.mixing_stoichiometry_spinel\n    },\n    'P': glbl_opt.P[sphere_idx]\n  };\n};\n\nvar mapLatticeDiffusionParam = function mapLatticeDiffusionParam(mcmc_param, sphere_idx, glbl_opt) {\n  return {\n    'targetPhase': glbl_opt.targetPhase,\n    'tau': mcmc_param.log10_tau,\n    'R': glbl_opt.radius[sphere_idx + 1],\n    'Rprev': glbl_opt.radius[sphere_idx],\n    'divNum': (sphere_idx + 1) * 10\n  };\n};\n\nmodule.exports = {\n  mapLiquidLineParam: mapLiquidLineParam,\n  mapLiquidLineForCrystalRimParam: mapLiquidLineForCrystalRimParam,\n  mapLatticeDiffusionParam: mapLatticeDiffusionParam,\n  mapMagmaMixingLineParam: mapMagmaMixingLineParam\n};\n\n//# sourceURL=webpack:///./model-src/opx_zoning_free_edge/map_model_parameter.js?");
+
+/***/ }),
+
+/***/ "./model-src/opx_zoning_free_edge/model.js":
+/*!*************************************************!*\
+  !*** ./model-src/opx_zoning_free_edge/model.js ***!
+  \*************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("function _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread(); }\n\nfunction _nonIterableSpread() { throw new TypeError(\"Invalid attempt to spread non-iterable instance\"); }\n\nfunction _iterableToArray(iter) { if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === \"[object Arguments]\") return Array.from(iter); }\n\nfunction _arrayWithoutHoles(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } }\n\n/**\r\n * The model returns chemical profile of Fe/Mg and Cr in a orthopyroxene phenocryst.\r\n *\r\n * Consider crustal processes below:\r\n * 1. Multiple rapid changes of melt composition\r\n * 2. Crystal growth of\r\n *  a. Olivine (Si-Mg-Fe-Cr-Ni)\r\n *  b. Orthopyroxene (Si-Mg-Fe-Al-Ca-Cr-Ni)\r\n *  c. Spinel (Cr-Ni)\r\n *  in the host melt\r\n * 3. Lattice diffusion of\r\n *  a. Fe-Mg interdiffusion\r\n *  b. Cr self diffusion\r\n *  in orthopyroxene\r\n */\nvar MagmaSystem = __webpack_require__(/*! ../../../phase/src/magma-system */ \"../phase/src/magma-system.js\");\n\nvar _require = __webpack_require__(/*! ./map_model_parameter */ \"./model-src/opx_zoning_free_edge/map_model_parameter.js\"),\n    mapLiquidLineParam = _require.mapLiquidLineParam,\n    mapLatticeDiffusionParam = _require.mapLatticeDiffusionParam,\n    mapMagmaMixingLineParam = _require.mapMagmaMixingLineParam;\n\nvar _require2 = __webpack_require__(/*! ./def_phases */ \"./model-src/opx_zoning_free_edge/def_phases.js\"),\n    melt = _require2.melt,\n    olivine = _require2.olivine,\n    orthopyroxene = _require2.orthopyroxene,\n    spinel = _require2.spinel,\n    meltThermometer = _require2.meltThermometer;\n\nvar initMagmaSystem = __webpack_require__(/*! ./initialize_magma_system */ \"./model-src/opx_zoning_free_edge/initialize_magma_system.js\");\n\nvar magmaMixingLine = __webpack_require__(/*! ./approximate_magma_mixing_line */ \"./model-src/opx_zoning_free_edge/approximate_magma_mixing_line.js\");\n\nvar liquidLine = __webpack_require__(/*! ./along_liquid_line */ \"./model-src/opx_zoning_free_edge/along_liquid_line.js\");\n\nvar evalDiffusionAfterEachShellGrows = __webpack_require__(/*! ./eval_diffusion */ \"./model-src/opx_zoning_free_edge/eval_diffusion.js\");\n\nvar mapProfileToPosition = __webpack_require__(/*! ./map_diffused_profile_to_position */ \"./model-src/opx_zoning_free_edge/map_diffused_profile_to_position.js\");\n\nvar getMagmaPT = function getMagmaPT(magma, opt) {\n  var pressure = magma.barometer();\n  var temperature = magma.thermometer(pressure);\n  return {\n    T: temperature,\n    P: pressure\n  };\n};\n/**\r\n * get index count from the reversal direction\r\n */\n\n\nvar fromLast = function fromLast(i, len) {\n  return len - i - 1;\n};\n\nvar repeatedArray = function repeatedArray(n) {\n  return function (array) {\n    return Array(n).fill(0).map(function (_) {\n      return _toConsumableArray(array);\n    }).flat();\n  };\n};\n/**\r\n * Construct magma system and model on generating chemical zoning of a target crystal.\r\n *\r\n */\n\n\nvar genMagmaModel = function genMagmaModel(option) {\n  /**\r\n   * Go back the change of host melt from the lava\r\n   *  composition to the primary melt.\r\n   * Trace corresponding chemical zoning of grown shell\r\n   *  of crystals.\r\n   * Evaluate lattice diffusion after growth of each shell.\r\n   * Assumed crustal processes are reputation of magma mixing, crystal growth,\r\n   *   and elemental diffusion in crystals.\r\n   * The time of reputation is the same as number of growth stage of the focused crystal.\r\n   * eruptedMelt =>\r\n   * ascend(push profile) -> beforeMixing ->\r\n   * ascend(push profile) -> beforeMixing ->\r\n   * ...->\r\n   * ascend(push profile)\r\n   * => primaryMelt\r\n   *\r\n   * then\r\n   * section.push(reverse(profileStack.pop()))\r\n   *  .diffuse()\r\n   *  .push(reverse(profileStack.pop()))\r\n   *  .diffuse()\r\n   *  ...\r\n   */\n  var magma = new MagmaSystem();\n  var repeat = repeatedArray(option.radius.length - 1);\n  var traceGoingBackLiquidLine = repeat([magmaMixingLine, liquidLine]);\n  magma.setThermodynamicHandler(getMagmaPT).setAction([initMagmaSystem].concat(_toConsumableArray(traceGoingBackLiquidLine), _toConsumableArray(repeat([evalDiffusionAfterEachShellGrows])))).setFinalAction(mapProfileToPosition);\n\n  var model = function model(mcmc_parameters, data) {\n    var isMCMC = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : true;\n\n    // Reverse input MCMC parameters to go back\n    //   from the rim to center\n    var parameters = _toConsumableArray(mcmc_parameters).reverse();\n\n    var paramNum = parameters.length;\n    var restoreLiquidLineParams = parameters.map(function (p, i) {\n      return [mapMagmaMixingLineParam(p, fromLast(i, paramNum), option), mapLiquidLineParam(p, fromLast(i, paramNum), option)];\n    }).flat();\n    var execLatticeDiffusionParams = parameters.map(function (p, i) {\n      return mapLatticeDiffusionParam(p, i, option);\n    });\n    /*\r\n    const last = parameters.length - 1;\r\n    let i = last\r\n    while (i >= 0) {\r\n        let p = parameters.pop();\r\n        parametersLiquidLine.push(getParameterMixing(p, i, option));\r\n        parametersLiquidLine.push(getParameterGrowth(p, i, option));\r\n        parametersDiffusion.push(getParameterDiffusion(p, last - i, option));\r\n        i--;\r\n    }\r\n    */\n\n    var initializeMagmaOpt = {\n      'systemComponents': {\n        'phase': [melt, olivine, orthopyroxene, spinel],\n        'thermometer': meltThermometer\n      },\n      'targetPhase': option.targetPhase,\n      'D': option.D0,\n      'finalMelt': option.finalMelt\n    };\n    var getZoningOpt = {\n      'targetPhase': option.targetPhase,\n      'dataPos': data.x\n    };\n    var modeledZoning = magma.execAction([initializeMagmaOpt].concat(_toConsumableArray(restoreLiquidLineParams), _toConsumableArray(execLatticeDiffusionParams), [getZoningOpt]));\n    return isMCMC ? modeledZoning : magma;\n  };\n\n  return {\n    magma: magma,\n    model: model\n  };\n};\n\nmodule.exports = genMagmaModel;\n\n//# sourceURL=webpack:///./model-src/opx_zoning_free_edge/model.js?");
+
+/***/ }),
+
+/***/ "./model-src/opx_zoning_free_edge/record_profile_with_local_equilibrium.js":
+/*!*********************************************************************************!*\
+  !*** ./model-src/opx_zoning_free_edge/record_profile_with_local_equilibrium.js ***!
+  \*********************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("function _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest(); }\n\nfunction _nonIterableRest() { throw new TypeError(\"Invalid attempt to destructure non-iterable instance\"); }\n\nfunction _iterableToArrayLimit(arr, i) { if (!(Symbol.iterator in Object(arr) || Object.prototype.toString.call(arr) === \"[object Arguments]\")) { return; } var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i[\"return\"] != null) _i[\"return\"](); } finally { if (_d) throw _e; } } return _arr; }\n\nfunction _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }\n\nvar checkInRange = function checkInRange(min, max) {\n  return function (x) {\n    return min <= x && x <= max;\n  };\n};\n\nvar checkExceed = function checkExceed(target) {\n  var sign = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1.;\n  return function (x) {\n    return (x - target) * sign > 0;\n  };\n};\n\nvar checkSame = function checkSame(target, eps) {\n  return function (x) {\n    return Math.abs(x - target) < eps;\n  };\n};\n/** recordLocalEquilibriumCondition\r\n * Simulate transition of the composition of host melt and involved solid phases\r\n *   during a reaction of melting or crystallization.\r\n * It starts from a condition where the host melt has a specific composition.\r\n * In each calculation step of, we calculate composition of solid phases\r\n *   by using partitioning coefficient assuming achievement of local equilibrium with host melt.\r\n * Then, when crystal growth is considered, small fraction of solid phases are removed from the host melt.\r\n * On the other hand, when assimilation of crystal is considered, they are added to the host melt.\r\n * In the calculation, we use Mg# of some phase as an extent of progression of the reaction.\r\n * Until Mg# of the focused phase becomes a given value, the steps are repeated.\r\n *\r\n * @param {*} magma\r\n * @param {*} observedPhaseName\r\n * @param {*} targetMgN\r\n * @param {*} stoichiometry\r\n * @param {*} dF\r\n * @param {*} toBeRecord\r\n *\r\n * moveCrystalBoundary(\r\n *  magma,\r\n *  'orthopyroxene',\r\n *  91.5,\r\n *  {olivine : 0.5, orthopyroxene : 0.495, spinel : 0.005},\r\n *  0.001,\r\n *  true\r\n * )\r\n */\n\n\nvar recordProfileWithLocalEquilibrium = function recordProfileWithLocalEquilibrium(magma, observedPhaseName, targetMgN, stoichiometry, dF, toBeRecord) {\n  var melt = magma.phase.melt;\n  var observedPhase = magma.phase[observedPhaseName];\n\n  var _magma$getThermodynam = magma.getThermodynamicProperty(),\n      T = _magma$getThermodynam.T,\n      P = _magma$getThermodynam.P;\n\n  observedPhase.equilibrate('melt', T, P);\n\n  var _ref = observedPhase.getMgNumber() < targetMgN ? {\n    sign: 1.,\n    pathName: 'ascend'\n  } : {\n    sign: -1.,\n    pathName: 'descend'\n  },\n      sign = _ref.sign,\n      pathName = _ref.pathName;\n\n  var isExceed = checkExceed(targetMgN, sign);\n  var isInRange = checkInRange(-1, 1);\n  var isSame = checkSame(targetMgN, 1e-3);\n  var F = 0;\n  var solids = Object.entries(magma.solids());\n  solids.map(function (_ref2) {\n    var _ref3 = _slicedToArray(_ref2, 2),\n        _ = _ref3[0],\n        phase = _ref3[1];\n\n    phase.resetProfile(pathName);\n  });\n  melt.resetProfile(pathName); // repeat until Mg# of targetPhase exceeds targetMgN or F becomes out of range [0,1]\n\n  var limit = 0;\n  melt.startDifferentiate();\n\n  var _loop = function _loop() {\n    var _magma$getThermodynam2 = magma.getThermodynamicProperty(),\n        T = _magma$getThermodynam2.T,\n        P = _magma$getThermodynam2.P; // equilibrate & record\n\n\n    solids.map(function (entry) {\n      entry[1].equilibrate('melt', T, P);\n    });\n\n    if (toBeRecord) {\n      // Record initial condition\n      solids.map(function (_ref4) {\n        var _ref5 = _slicedToArray(_ref4, 2),\n            name = _ref5[0],\n            phase = _ref5[1];\n\n        phase.pushProfile(stoichiometry[name] * F, T, P, pathName);\n      });\n      melt.pushProfile(1 + F * sign, T, P, pathName);\n    } // change melt as not exceeding final condition\n\n\n    melt.differentiate(solids.map(function (_ref6) {\n      var _ref7 = _slicedToArray(_ref6, 2),\n          name = _ref7[0],\n          phase = _ref7[1];\n\n      return {\n        phase: phase,\n        f: stoichiometry[name]\n      };\n    }), dF * sign).compensateFe(); // to check whether exceeding final condition\n\n    observedPhase.equilibrate('melt', T, P); // While exceeding final condition,\n    //  revert melt composition and add/remove\n    //  smaller fraction of solid again.\n\n    var _loop2 = function _loop2() {\n      var _magma$getThermodynam3 = magma.getThermodynamicProperty(),\n          T = _magma$getThermodynam3.T,\n          P = _magma$getThermodynam3.P; // revert change of melt composition\n\n\n      melt.differentiate(solids.map(function (_ref8) {\n        var _ref9 = _slicedToArray(_ref8, 2),\n            name = _ref9[0],\n            phase = _ref9[1];\n\n        return {\n          phase: phase,\n          f: stoichiometry[name]\n        };\n      }), dF * sign / (1 + dF * sign) * -1).compensateFe(); // change with smaller fraction\n\n      dF *= 0.5;\n      melt.differentiate(solids.map(function (_ref10) {\n        var _ref11 = _slicedToArray(_ref10, 2),\n            name = _ref11[0],\n            phase = _ref11[1];\n\n        return {\n          phase: phase,\n          f: stoichiometry[name]\n        };\n      }), dF * sign).compensateFe(); // re-equilibrate to check whether exceeding final condition\n\n      solids.map(function (entry) {\n        entry[1].equilibrate('melt', T, P);\n      });\n      limit++;\n      if (limit > 100) return \"break\";\n    };\n\n    while (isExceed(observedPhase.getMgNumber())) {\n      var _ret2 = _loop2();\n\n      if (_ret2 === \"break\") break;\n    } // Update total fraction not exceeding final condition\n\n\n    F += dF;\n    if (isSame(observedPhase.getMgNumber())) return \"break\";\n  };\n\n  while (isInRange(F) && !isExceed(observedPhase.getMgNumber()) && !melt.outOfRange) {\n    var _ret = _loop();\n\n    if (_ret === \"break\") break;\n  } // Record final state\n\n\n  if (toBeRecord) {\n    solids.map(function (entry) {\n      var name = entry[0],\n          phase = entry[1];\n      phase.pushProfile(stoichiometry[name] * F, T, P, pathName);\n    });\n    melt.pushProfile(1 + F * sign, T, P, pathName);\n  }\n\n  return pathName;\n};\n\nmodule.exports = recordProfileWithLocalEquilibrium;\n\n//# sourceURL=webpack:///./model-src/opx_zoning_free_edge/record_profile_with_local_equilibrium.js?");
+
+/***/ }),
+
+/***/ "./model-src/opx_zoning_free_edge/sample_melt_composition.js":
+/*!*******************************************************************!*\
+  !*** ./model-src/opx_zoning_free_edge/sample_melt_composition.js ***!
+  \*******************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("function _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread(); }\n\nfunction _nonIterableSpread() { throw new TypeError(\"Invalid attempt to spread non-iterable instance\"); }\n\nfunction _iterableToArray(iter) { if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === \"[object Arguments]\") return Array.from(iter); }\n\nfunction _arrayWithoutHoles(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } }\n\nfunction _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest(); }\n\nfunction _nonIterableRest() { throw new TypeError(\"Invalid attempt to destructure non-iterable instance\"); }\n\nfunction _iterableToArrayLimit(arr, i) { if (!(Symbol.iterator in Object(arr) || Object.prototype.toString.call(arr) === \"[object Arguments]\")) { return; } var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i[\"return\"] != null) _i[\"return\"](); } finally { if (_d) throw _e; } } return _arr; }\n\nfunction _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }\n\nvar dfRowToParameters = function dfRowToParameters(df, index) {\n  var p = [];\n  var row = Object.entries(df).map(function (_ref) {\n    var _ref2 = _slicedToArray(_ref, 2),\n        key = _ref2[0],\n        column = _ref2[1];\n\n    try {\n      var stage = key.match(/[0-9]+$/)[0];\n      var parameterName = key.replace(stage, \"\");\n    } catch (_unused) {\n      return [];\n    }\n\n    return [{\n      stage: parseInt(stage),\n      parameter: parameterName,\n      value: parseFloat(column[index])\n    }];\n  }).reduce(function (a, b) {\n    return [].concat(_toConsumableArray(a), _toConsumableArray(b));\n  }, []);\n  row.map(function (obj) {\n    return obj.stage;\n  }).filter(function (x, i, self) {\n    return self.indexOf(x) === i;\n  }).map(function (_, i) {\n    p[i] = {};\n  });\n  row.map(function (_ref3) {\n    var stage = _ref3.stage,\n        parameter = _ref3.parameter,\n        value = _ref3.value;\n    p[stage][parameter] = value;\n  });\n  return p;\n};\n\nvar meltBeforeCrystallization = function meltBeforeCrystallization(df, index, stage, model, data) {\n  var liquidLineStack = model(dfRowToParameters(df, index), data, false).custom.differentiationLineStack;\n  var l = liquidLineStack.length;\n  var liquidLine = liquidLineStack[l - stage - 1];\n  var obj = {};\n  Object.entries(liquidLine).map(function (_ref4) {\n    var _ref5 = _slicedToArray(_ref4, 2),\n        key = _ref5[0],\n        array = _ref5[1];\n\n    obj[key] = array[array.length - 1];\n  });\n  return obj;\n};\n\nvar meltBeforeMixing = function meltBeforeMixing(df, index, stage, model, data) {\n  var liquidLineStack = model(dfRowToParameters(df, index), data, false).custom.differentiationLineStack;\n  var l = liquidLineStack.length;\n  var liquidLine = liquidLineStack[l - stage - 1];\n  var obj = {};\n  Object.entries(liquidLine).map(function (_ref6) {\n    var _ref7 = _slicedToArray(_ref6, 2),\n        key = _ref7[0],\n        array = _ref7[1];\n\n    obj[key] = array[0];\n  });\n  return obj;\n};\n/**\n *\n * @param {*} df\n *  DataFrame of model parameters\n * @param {*} model\n * @param {*} data\n * @param {*} directory\n */\n\n\nvar sampleMeltComposition = function sampleMeltComposition(df, model, data, directory, num_mc, fs) {\n  var reduceToCsv = function reduceToCsv(a, b) {\n    return a + \",\" + b;\n  };\n\n  var ini_path = function ini_path(stage) {\n    return \"\".concat(directory, \"initial_melt_MC-\").concat(num_mc, \"_stage-\").concat(stage, \".csv\");\n  };\n\n  var fin_path = function fin_path(stage) {\n    return \"\".concat(directory, \"final_melt_MC-\").concat(num_mc, \"_stage-\").concat(stage, \".csv\");\n  };\n\n  var stageLength = Object.keys(df).filter(function (param) {\n    return /MgN_beforeCrystallization[0-9]+/.test(param);\n  }).length;\n  var l = df[Object.keys(df)[0]].length;\n\n  for (var stage = 0; stage < stageLength; stage++) {\n    for (var i = 0; i < l; i++) {\n      var ini_melt = meltBeforeCrystallization(df, i, stage, model, data);\n      var fin_melt = meltBeforeMixing(df, i, stage, model, data);\n\n      if (i === 0) {\n        fs.writeFileSync(ini_path(stage), Object.keys(ini_melt).reduce(reduceToCsv) + \",lnP\\n\");\n        fs.writeFileSync(fin_path(stage), Object.keys(fin_melt).reduce(reduceToCsv) + \",lnP\\n\");\n      }\n\n      fs.appendFileSync(ini_path(stage), Object.values(ini_melt).reduce(reduceToCsv) + \",\" + df.lnP[i] + \"\\n\");\n      fs.appendFileSync(fin_path(stage), Object.values(fin_melt).reduce(reduceToCsv) + \",\" + df.lnP[i] + \"\\n\");\n    }\n\n    console.log(\"Stage \".concat(stage + 1, \"/\").concat(stageLength, \" fulfilled.\"));\n  }\n};\n\nmodule.exports = sampleMeltComposition;\n\n//# sourceURL=webpack:///./model-src/opx_zoning_free_edge/sample_melt_composition.js?");
+
+/***/ })
+
+/******/ });
+});

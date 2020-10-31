@@ -15,8 +15,8 @@ this.addEventListener("message", function (ev) {
     case "initialize":
       state.id = msg.id;
 
-      const seed = (msg.option.hasOwnProperty("seed"))
-        ? msg.option.seed[state.id]
+      const seed = (msg.hasOwnProperty("seed") && typeof msg.seed !== "undefined")
+        ? msg.seed[state.id]
         : state.id
 
       importScripts("../../" + msg.model);

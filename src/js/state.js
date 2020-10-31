@@ -17,6 +17,7 @@
     "isDirty": true,
     "ptSeed": 200,
     "seed": [],
+    "randomSeed": true,
     "totalIteration": 0,
     "iteration": 200,
     "workerNum": 4,
@@ -36,7 +37,8 @@
     "option_file": "",
     "plotInterval": 1,
     "mcmcInternalState": [],
-    "mcmcState": "idle"
+    "mcmcState": "initial",
+    "idPlotMCMC": 0
   }
 
   return state;

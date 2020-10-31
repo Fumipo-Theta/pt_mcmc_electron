@@ -29,10 +29,7 @@
    */
   class MCMC {
     constructor(seed) {
-      this.rand = new mt((seed === undefined)
-        ? new Date().getTime()
-        : seed
-      )
+      this.setSeed(seed);
       this.eps = 1e-6;
       this.outRangeFlag = false;
       return this;
@@ -51,7 +48,7 @@
         parameters: this.parameters,
         lnP: this.lnP,
         rand: this.rand.getInternalState(),
-        acceptedTime : this.acceptedTime
+        acceptedTime: this.acceptedTime
       };
     }
 
@@ -94,10 +91,10 @@
       this.lnPcand = -100000000;
       this.samplerMode = (mode === "sampler") ? true : false;
 
-      parameters.map((parameter, i) => {
+      parameters.forEach((parameter, i) => {
         this.acceptedTime[i] = {};
         this.sampledTime[i] = {};
-        Object.keys(parameter).map(k => {
+        Object.keys(parameter).forEach(k => {
           this.acceptedTime[i][k] = 0;
           this.sampledTime[i][k] = 0;
         })
@@ -294,8 +291,8 @@
       const keys = (_keys.length === 0)
         ? Object.keys(this.updateStep)
         : _keys;
-      take(this.parameters.length).map((_, i) => {
-        keys.map(k => {
+      take(this.parameters.length).forEach((_, i) => {
+        keys.forEach(k => {
           let step = this.updateStep[k].val;
 
           this.parameters[i][k] = (v => {
@@ -381,17 +378,17 @@
       const parameter = [];
       const lnP = [];
       const keys = Object.keys(this.updateStep);
-      this.parameters.map((_, i) => {
+      this.parameters.forEach((_, i) => {
         parameter[i] = {};
-        keys.map(k => {
+        keys.forEach(k => {
           parameter[i][k] = [];
         })
       })
 
       Array(times).fill(0)
         .map(_ => this.sampling1set(byLineElement, keys))
-        .map(sets => {
-          sets.map((r, j) => {
+        .forEach(sets => {
+          sets.forEach((r, j) => {
             let { i, key, value } = r.sampled;
             parameter[i][key].push(value)
             lnP.push(r.lnP);

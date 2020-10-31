@@ -6,12 +6,13 @@
   } else {
     root.eventHandler = factory(
       root.PubSub,
-      root.TextParser,
+      root.textFile,
       root.palette,
-      root.ModalMedia
+      root.ModalMedia,
+      root.plotAfterEvent
     );
   }
-}(this, function (_PubSub, _tf, _palette, _ModalMedia) {
+}(this, function (_PubSub, _tf, _palette, _ModalMedia, _plotAfterEvent) {
 
   const { Publisher, Subscriber } = (typeof require === 'undefined' && (typeof _PubSub === 'object' || typeof _PubSub === 'function'))
     ? _PubSub
@@ -29,6 +30,11 @@
     ? _ModalMedia
     : require("./modal-media");
 
+  const { plotAfterSample } = (typeof require === 'undefined' && (typeof _plotAfterEvent === 'object' || typeof _plotAfterEvent === 'function'))
+    ? _plotAfterEvent
+    : require("./plot-after-event.js");
+
+
   const fetchFunc = (url, option) => (typeof require !== 'undefined')
     ? (fs => {
       return new Promise((res, rej) => {
@@ -40,6 +46,7 @@
       fetch(url)
         .then(response => res(response.text()))
     });
+
 
   const df2table = df => {
     const thead = Object.keys(df);
@@ -67,6 +74,14 @@
 
   /**
    * 
+   */
+  const approxiateProbability = (state) => {
+    if (!(state.hasOwnProperty("data") && state.hasOwnProperty("error"))) return null;
+
+  }
+
+  /**
+   * 
    * Workerからmodelなどをstringifyして受け取ったものをmarkdownのコードブロックとして表示する.
    * data.replace(/\\r\\n/g, "\n").replace(/\\["']/g, "").replace(/"/g, "")は,
    * 余分な改行を削除,
@@ -83,6 +98,7 @@
     document.querySelector("#modal_window")
   )
 
+
   const dom_totalIteration = document.querySelector("#totalCount");
 
   const dom_input = {
@@ -93,7 +109,12 @@
     outputPrefix: document.querySelector("#output_prefix_input"),
     alpha: document.querySelector("#alpha_input"),
     model: document.querySelector("#model_file_name_input"),
-    plotInterval: document.querySelector("#plotInterval_input")
+    plotInterval: document.querySelector("#plotInterval_input"),
+    idPlotMCMC: document.querySelector("#idPlotMCMC_input")
+  }
+
+  const dom_check = {
+    randomSeed: document.querySelector("#random_seed_flag_input")
   }
 
   const dom_show = {
@@ -104,15 +125,60 @@
     error: document.querySelector("#error_file_name")
   }
 
+  const dom_currentIteration = document.querySelector("#presentCount");
+  const dom_acceptedTable = document.querySelector("#accepted_table table");
+  const dom_exchangeTable = document.querySelector("#exchange_table table");
 
 
-  const initialize = state => {
-    Object.entries(dom_input).map(([k, dom]) => {
-      dom.value = state[k];
-    })
+  const updateTable = (dom_table, tbodyArray, thead = [], tbodyHead = []) => {
+    const dom_thead = dom_table.querySelector("thead");
+    const dom_tbody = dom_table.querySelector("tbody");
+
+    if (thead.length > 0) {
+      dom_thead.innerHTML = `<thead><th></th>${thead.map(v => `<th>${v.replace(/_/g, " ")}</th>`).reduce((a, b) => a + b, "")}</thead>`
+    }
+
+    dom_tbody.innerHTML = `<tbody>
+    ${tbodyArray.map((rowAsArray, i) => {
+        const th = (tbodyHead[i] === undefined) ? "" : tbodyHead[i]
+        return `<tr>
+        <th>${th}</th>
+        ${rowAsArray.map(v => `<td>${v}</td>`).reduce((a, b) => a + b, "")}
+      </tr>`
+      }).reduce((a, b) => a + "\n" + b, "")}
+    </tbody>`
+
   }
 
-  return (ptmcmc, state) => {
+  const initialize = state => {
+    Object.entries(dom_input).forEach(([k, dom]) => {
+      dom.value = state[k];
+    });
+    Object.entries(dom_check).forEach(([k, dom]) => {
+      dom.checked = state[k];
+    });
+  }
+
+  const updateAcceptedRate = (ptmcmc, state, id) => {
+    if (parseInt(id) === parseInt(state.idPlotMCMC)) updateTable(
+      dom_acceptedTable,
+      state.acceptedTime[id].map(paramSet => Object.values(paramSet)),
+      Object.keys(state.acceptedTime[id][0]),
+      state.acceptedTime[id].map((_, i) => "parameter set " + i)
+    )
+  }
+
+  const updateExchangeRate = (ptmcmc, state) => {
+    dom_currentIteration.innerHTML = ptmcmc.totalIteration;
+
+    updateTable(
+      dom_exchangeTable,
+      [state.exchangeTime],
+      Array(state.workerNum - 1).fill(0).map((_, i) => `${i}-${i + 1}`)
+    )
+  }
+
+  const eventHandler = (ptmcmc, state) => {
 
     initialize(state);
 
@@ -123,6 +189,9 @@
       const publisher = new Publisher()
       const subscriber = publisher.subscriber();
 
+      /**
+       * 以前のメタファイルが渡されると, WebWorkerとのセッションを開始した直後に乱数生成器の状態を復元する.
+       */
       subscriber.subscribe("restart", ({ file, state, ptmcmc }) => {
         const reader = new FileReader();
         reader.readAsText(file);
@@ -144,7 +213,7 @@
             "primaryKey",
             "option_file",
             "option"
-          ].map(key => {
+          ].forEach(key => {
             if (!meta.hasOwnProperty(key)) throw new Error("Invaild back up format.");
             publisher.publish("change_value", {
               value: meta[key],
@@ -190,7 +259,7 @@
         }
 
         reader.onerror = err => {
-          //document.querySelector(label).innerHTML = "Not loaded !"
+          //$(label).innerHTML = "Not loaded !"
         }
       })
 
@@ -234,6 +303,8 @@
 
         // コントローラーを定義したほうが良さそう
         if (state.isDirty) {
+          if (state.randomSeed) ptmcmc.setSeed();
+
           ptmcmc
             .startSession(
               state.workerNum,
@@ -244,7 +315,8 @@
                 },
                 "model": state.model,
                 "alpha": state.alpha,
-                "option": state.option
+                "option": state.option,
+                "randomSeed": state.randomSeed
               });
           state.seed = [];
           state.totalIteration = 0;
@@ -292,6 +364,10 @@
             publisher.publish("pause", { ptmcmc, state });
             start_button.value = "Continue";
             break;
+          case "initial":
+            publisher.publish("execute", state);
+            start_button.value = "Pause";
+            break;
           case "idle":
             publisher.publish("execute", state);
             start_button.value = "Pause";
@@ -310,6 +386,9 @@
 
         switch (state.mcmcState) {
           case "running":
+            break;
+          case "initial":
+            start_button.value = "Restart"
             break;
           case "idle":
             start_button.value = "Restart"
@@ -427,8 +506,45 @@
           })
         });
 
+      dom_input.idPlotMCMC
+        .addEventListener("change", ev => {
+          ev.preventDefault();
+          publisher.publish("change_value", {
+            value: dom_input.idPlotMCMC.value,
+            key: "idPlotMCMC",
+            state: state
+          })
 
-      [["option", "json"], ["data", "csv"], ["error", "csv"]].map(([key, format]) => {
+          if (state.mcmcState === "idle") {
+            updateAcceptedRate(ptmcmc, state, dom_input.idPlotMCMC.value);
+            updateExchangeRate(ptmcmc, state);
+            plotAfterSample(ptmcmc, { id: dom_input.idPlotMCMC.value }, state);
+          }
+
+        }, false);
+
+      dom_input.idPlotMCMC
+        .addEventListener("keydown", ev => {
+
+        }, false);
+
+
+      dom_check.randomSeed.addEventListener("change",
+        ev => {
+          publisher.publish("change_value", {
+            value: dom_check.randomSeed.checked,
+            key: "randomSeed",
+            state: state
+          });
+          publisher.publish("change_value", {
+            value: true,
+            key: "isDirty",
+            state: state
+          });
+        }, false
+      );
+
+      [["option", "json"], ["data", "csv"], ["error", "csv"]].forEach(([key, format]) => {
         const dom_list = document.querySelector(`#${key}_file_list`)
         dom_list.ondragover = function () {
           dom_list.classList.add("drag-over")
@@ -524,5 +640,11 @@
         false
       )
     }
+  }
+
+  return {
+    updateAcceptedRate,
+    updateExchangeRate,
+    eventHandler
   }
 }))

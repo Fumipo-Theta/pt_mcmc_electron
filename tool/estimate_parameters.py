@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import json
 import numpy as np
@@ -9,7 +10,7 @@ import matplotlib.cm as cm
 from matplotlib.colors import LinearSegmentedColormap
 
 
-def generate_cmap(colors):
+def _generate_cmap(colors):
     """自分で定義したカラーマップを返す"""
     values = range(len(colors))
 
@@ -20,19 +21,20 @@ def generate_cmap(colors):
     return LinearSegmentedColormap.from_list('custom_cmap', color_list)
 
 
-def fileList(dir, func):
+def _fileList(dir, func):
     return list(filter(func, os.listdir(dir)))
 
 
 class MCMCresult:
-    def __init__(self):
-        self.acceptedColor = generate_cmap(["#bb0000", "#888888", "#0000bb"])
+    def __init__(self, Num_MCMC=0):
+        self.Num_MCMC = Num_MCMC
+        self.acceptedColor = _generate_cmap(["#bb0000", "#888888", "#0000bb"])
 
     def readMelt(self, stageNumber, rootDir="./"):
         self.melt = pd.concat(
             list(
                 map(pd.read_csv,
-                    fileList(rootDir, lambda file: file.find(
+                    _fileList(rootDir, lambda file: file.find(
                         "melt_"+str(stageNumber)) >= 0)
                     )
             ),
@@ -41,15 +43,16 @@ class MCMCresult:
 
     def readMeta(self, rootDir="./"):
         metaFile = open(
-            fileList(rootDir, lambda file: file.find("meta-") >= 0).pop())
+            _fileList(rootDir, lambda file: file.find("meta-") >= 0).pop())
         self.meta = json.load(metaFile)
         # print(self.meta["acceptedTime"][0])
 
-    def readCsv(self, rootDir="./", Num_MCMC=0):
+    def readCsv(self, rootDir="./"):
+        Num_MCMC = self.Num_MCMC
         self.csvData = pd.concat(
             list(
                 map(pd.read_csv,
-                    fileList(rootDir, lambda file: file.find(
+                    _fileList(rootDir, lambda file: file.find(
                         "sample-"+str(Num_MCMC)) >= 0)
                     )
             ),
@@ -89,7 +92,7 @@ class MCMCresult:
         graphNum = 1
 
         for p, k in zip(self.parameterTypes, range(len(self.parameterTypes))):
-            stageNum = 0
+            stageNum = 1
             for i in range(0, dimX):
 
                 ax = fig.add_subplot(dimY, dimX, graphNum)
@@ -98,9 +101,11 @@ class MCMCresult:
                     self.meta["acceptedTime"][0][i][p]/self.dataLen))
                 # ax.set_ylim(paramRange[p])
                 if i == 0:
-                    ax.set_ylabel(p.replace("_", " "), fontsize=28)
+                    ax.set_ylabel(p.replace("_", " "), fontsize=28,
+                                  fontfamily="Times New Roman")
                 if k == 0:
-                    ax.set_title("stage "+str(stageNum), fontsize=36)
+                    ax.set_title("stage "+str(stageNum),
+                                 fontsize=36, fontfamily="Times New Roman")
                 ax.tick_params(labelsize=36)
                 ax.set_frame_on(True)
                 ax.set_ylim([self.meta["option"]["updateCondition"][p]["min"],
@@ -136,7 +141,7 @@ class MCMCresult:
         graphNum = 1
 
         for p, k in zip(self.parameterTypes, range(len(self.parameterTypes))):
-            stageNum = 0
+            stageNum = 1
             for i in range(0, dimX):
                 ax = fig.add_subplot(dimY, dimX, graphNum)
                 ax.hist(data[p+str(i)].sort_values()[lower:upper],
@@ -145,9 +150,11 @@ class MCMCresult:
                             self.meta["acceptedTime"][0][i][p]/self.dataLen),
                         density=True)
                 if i == 0:
-                    ax.set_ylabel(p.replace("_", " "), fontsize=28)
+                    ax.set_ylabel(p.replace("_", " "), fontsize=28,
+                                  fontfamily="Times New Roman")
                 if k == 0:
-                    ax.set_title("stage "+str(stageNum), fontsize=36)
+                    ax.set_title("stage "+str(stageNum),
+                                 fontsize=36, fontfamily="Times New Roman")
                 ax.tick_params(labelsize=32)
                 # ax.set_xlim(paramRange[p])
                 graphNum = graphNum + 1
@@ -184,7 +191,7 @@ class MCMCresult:
         ax2.tick_params(labelsize=32)
         return (ax1, ax2)
 
-    def writeSummary(self, burnIn=0, p_val=0, bins=40, filterFunc=lambda csv: csv,  outputPath="./summary.csv"):
+    def writeSummary(self, burnIn=0, p_val=0, bins=40, filterFunc=lambda csv: csv):
         data = filterFunc(self.csvData[burnIn:self.dataLen])
 
         print("data number: ", len(data))
@@ -231,6 +238,7 @@ class MCMCresult:
 
         display(df)
 
+        outputPath = f"./computed/summary_MCMC-{self.Num_MCMC}.csv"
         df.to_csv(outputPath)
 
     def showMeltTransition(self, elementFunc, burnIn=0):
